@@ -16,7 +16,7 @@ Installation:
 - set the parameters in ./settings.py (22 cells LTO batteries in my case)
 - add command ln -s /data/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries into /data/rc.local
 
-The service starts automatically after start/restart of the Venus OS. Afrer changing of aggregatebatteries.py or
+The service starts automatically after start/restart of the Venus OS. After changing of aggregatebatteries.py or
 settings.py restart it by executing:
 
 ./restart - it kills the service which starts automatically again.
