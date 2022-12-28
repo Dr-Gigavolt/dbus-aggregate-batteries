@@ -1,6 +1,9 @@
 This is a service for Victron Venus OS to collect the data from multiple parallel-connected batteries using
 https://github.com/Louisvdw/dbus-serialbattery driver, merge them and publish as a single virtual battery to Dbus.
-I test the program only JK BMS. I have no other hardware.
+
+It could serve at least as the temporary solution for https://github.com/Louisvdw/dbus-serialbattery/issues/8
+
+I test the program only with JK BMS. I have no other hardware.
 
 Attention: This is my first experience with the Victron system and this software is not tested properly yet.
 I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability.
@@ -11,7 +14,7 @@ Installation:
 - copy the stuff into it
 - set chmod 744 for ./service/run and ./restart
 - set the parameters in ./settings.py (22 cells LTO batteries in my case)
-- add commant ln -s /data/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries into /data/rc.local
+- add command ln -s /data/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries into /data/rc.local
 
 The service starts automatically after start/restart of the Venus OS. Afrer changing of aggregatebatteries.py or
 settings.py restart it by executing:
@@ -51,4 +54,7 @@ or the first cell falls down to MIN_CELL_VOLTAGE.
 
 Logging file:
 ./aggregatebatteries.log	
-	
+
+Known issues:
+- the current measurement of JK BMS is very unprecise, I suppose it is interfered by the AC component drawn my Multis. Therefore the SoC is unprecise too with cumulative error. I will try to work with currents published by multis and MPPTs.
+- the last data from dbus-serialbattery driver remain on Dbus if the connection is interrupted. Therefore my software cannot recognize it as well.
