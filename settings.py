@@ -1,5 +1,6 @@
 NR_OF_BATTERIES = 2                                     # Nr. of physical batteries to be aggregated
 SERVICE_KEY_WORD = 'com.victronenergy.battery.ttyUSB'   # Key world to identify services of physical Serial Batteries
+PRODUCT_NAME_KEY_WORD = 'SerialBattery'                 # Key world to identify the product name (to exclude SmartShunt)
 SCAN_TRIALS = 10                                        # Trials to identify of all batteries before exit
 READ_TRIALS = 20                                        # Trials to get consistent data of all batteries before exit
 
