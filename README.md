@@ -27,7 +27,7 @@ and start by: python3 aggregatebatteries.py
 Function:
 
 on start:
-	- all services containing SERVICE_KEY_WORD in their names are found
+	- all services containing SERVICE_KEY_WORD in their names and PRODUCT_NAME_KEY_WORD in their product names are found (double-check is necessary to         exclude SmartShunts, they are published as batteries)
 every second:
 	- data of all batteries are collected
 	- data are merged, e.g. average voltage, sum of currents, average of SoC, cells with absolute minimum and maximum voltage etc.,
