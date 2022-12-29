@@ -4,11 +4,7 @@ PRODUCT_NAME_KEY_WORD = 'SerialBattery'                 # Key world to identify 
 SCAN_TRIALS = 10                                        # Trials to identify of all batteries before exit
 READ_TRIALS = 20                                        # Trials to get consistent data of all batteries before exit
 
-ABSORPTION_VOLTAGE = 2.5                                # Absorption voltage = this value * nr. of cells
-ABSORBTION_TIME_M = 30                                  # in minutes
-ABSORBTION_RESTART_H = 6                                # time in hours to allow absorption again                            
-FLOAT_VOLTAGE = 2.45                                    # Float voltage = this value * nr. of cells                 
-RE_BULK_VOLTAGE = 2.4
+CHARGE_VOLTAGE = 2.5                                # Absorption voltage = this value * nr. of cells
 MAX_CELL_VOLTAGE = 2.7                                  # If reached by 1-st cell, the charger voltage is clamped to the measured value
 DISCHARGE_VOLTAGE = 2                                   # If reached, discharge current set to zero
 MIN_CELL_VOLTAGE = 1.9

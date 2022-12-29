@@ -20,15 +20,10 @@ import sys
 import os
 import dbus
 from settings import *
-import time as tt
 from datetime import datetime as dt
 
 sys.path.append('/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')
 from vedbus import VeDbusService, VeDbusItemImport
-
-BULK = 0
-ABSORPTION = 1
-FLOAT = 2
 
 class DbusAggBatService(object):
     
@@ -36,11 +31,6 @@ class DbusAggBatService(object):
         self._batteries = []
         self._scanTrials = 0
         self._readTrials = 0
-        self._chargeState = BULK
-        self._absorptionFinished = False
-        self._absorptionPauseFinished = True
-        self._absorptionStartTime = 0
-        self._absorptionStopTime = 0
         self._MaxChargeVoltage_old = 0
         self._MaxChargeCurrent_old = 0
         self._MaxDischargeCurrent_old = 0
@@ -101,8 +91,6 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
         self._dbusservice.add_path('/Info/MaxDischargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
         self._dbusservice.add_path('/Info/MaxChargeVoltage', None, writeable=True, gettextcallback=lambda a, x: "{:.1f}V".format(x))
-        
-        self._now = tt.time()
          
         GLib.timeout_add(1000, self._scan)  # search connected batteries
     
@@ -138,13 +126,13 @@ class DbusAggBatService(object):
     def _max(self, x):
         try:
             return max(x)
-        except:
+        except Exception:
             return None
        
     def _min(self, x):
         try:
             return min(x)
-        except:
+        except Exception:
             return None
 
     #########################################    
@@ -242,7 +230,7 @@ class DbusAggBatService(object):
                 HighTemperature_alarm.append(VeDbusItemImport(self._dbusConn, self._batteries[i], '/Alarms/HighTemperature').get_value())
                 LowTemperature_alarm.append(VeDbusItemImport(self._dbusConn, self._batteries[i], '/Alarms/LowTemperature').get_value())
                
-        except:
+        except Exception:
             self._readTrials += 1
             logging.error('%s: ERROR: DBus Value Error. Read trial nr. %d' % (dt.now(), self._readTrials))
             if (self._readTrials > READ_TRIALS):
@@ -285,44 +273,12 @@ class DbusAggBatService(object):
         HighTemperature_alarm = self._max(HighTemperature_alarm)
         LowTemperature_alarm = self._max(LowTemperature_alarm)
         
-        # manage charge voltage
-        if self._chargeState == BULK:     
-            MaxChargeVoltage = ABSORPTION_VOLTAGE * NrOfCellsPerBattery    
-            if (MaxCellVoltage >= MAX_CELL_VOLTAGE) or (Voltage >= ABSORPTION_VOLTAGE * NrOfCellsPerBattery):                    
-                if self._absorptionPauseFinished:
-                    self._chargeState = ABSORPTION
-                    self._absorptionStartTime = tt.time()
-                    logging.info('%s: Starting absorption after bulk' % dt.now())
-                else:
-                    self._chargeState = FLOAT
-                    logging.info('%s: Starting float after bulk' % dt.now())
-                
-        if self._chargeState == ABSORPTION:                     # not elif, if ABSORPTION set above, cann be as next processed here 
-            if (MaxCellVoltage >= MAX_CELL_VOLTAGE):
-                    MaxChargeVoltage = Voltage            # clamp the voltage to the current value if one cell goes too high
-                    logging.info('%s: Max. cell voltage reached. Absorption voltage limited to %.2fV' % (dt.now(), Voltage))
-            else:
-                MaxChargeVoltage = (ABSORPTION_VOLTAGE * NrOfCellsPerBattery)
-            if (Voltage < RE_BULK_VOLTAGE * NrOfCellsPerBattery):
-                self._chargeState = BULK
-            elif (tt.time() - self._absorptionStartTime) >= ABSORBTION_TIME_M * 60:
-                self._absorptionFinished = True
-                self._chargeState = FLOAT
-                self._absorptionStopTime = tt.time()
-                logging.info('%s: Starting float after absorption' % dt.now())
-        
-        if self._chargeState == FLOAT:                          # not elif, if FLOAT set above, cann be as next processed here 
-            if (MaxCellVoltage >= MAX_CELL_VOLTAGE) and (FLOAT_VOLTAGE * NrOfCellsPerBattery > Voltage):
-                    MaxChargeVoltage = Voltage    # clamp the voltage to the current value if one cell goes too high
-                    logging.info('%s: Max. cell voltage reached. Nominal float voltage is too high. Absorption voltage limited to %.2fV' % (dt.now(), Voltage))
-            else:
-                MaxChargeVoltage = (FLOAT_VOLTAGE * NrOfCellsPerBattery)
-                
-        if (not self._absorptionPauseFinished) and ((tt.time() - absorptionStopTime) >= ABSORBTION_RESTART_H * 3600):
-            self._absorptionPauseFinished = True
-            logging.info('%s: Absorption pause finished.' % dt.now())
-
-        
+        # manage charge voltage       
+        if MaxCellVoltage >= MAX_CELL_VOLTAGE:
+            MaxChargeVoltage = Voltage                          # clamp the voltage to the current value if one cell goes too high
+        else:     
+            MaxChargeVoltage = CHARGE_VOLTAGE * NrOfCellsPerBattery
+       
         # manage charge current
         if (MaxCellVoltage >= CV2):                             # CV2 > CV1
             MaxChargeCurrent = MAX_CHARGE_CURRENT_ABOVE_CV2
@@ -352,54 +308,56 @@ class DbusAggBatService(object):
             self._MaxDischargeCurrent_old = MaxDischargeCurrent        
                
         
-        # send DC
-        self._dbusservice['/Dc/0/Voltage'] = round(Voltage, 1)
-        self._dbusservice['/Dc/0/Current'] = round(Current, 1)
-        self._dbusservice['/Dc/0/Power'] = round(Power, 0)
+        with self._dbusservice as bus:
         
-        # send capacity
-        self._dbusservice['/Soc'] = Soc
-        self._dbusservice['/Capacity'] = Capacity
-        self._dbusservice['/InstalledCapacity'] = InstalledCapacity
-        self._dbusservice['/ConsumedAmphours'] = ConsumedAmphours
+            # send DC
+            bus['/Dc/0/Voltage'] = round(Voltage, 1)
+            bus['/Dc/0/Current'] = round(Current, 1)
+            bus['/Dc/0/Power'] = round(Power, 0)
         
-        # send temperature
-        self._dbusservice['/Dc/0/Temperature'] = Temperature
-        self._dbusservice['/System/MaxCellTemperature'] = MaxCellTemp
-        self._dbusservice['/System/MinCellTemperature'] = MinCellTemp
+            # send capacity
+            bus['/Soc'] = Soc
+            bus['/Capacity'] = Capacity
+            bus['/InstalledCapacity'] = InstalledCapacity
+            bus['/ConsumedAmphours'] = ConsumedAmphours
         
-        # send cell min/max voltage
-        self._dbusservice['/System/MaxCellVoltage'] = MaxCellVoltage
-        self._dbusservice['/System/MaxVoltageCellId'] = MaxVoltageCellId
-        self._dbusservice['/System/MinCellVoltage'] = MinCellVoltage
-        self._dbusservice['/System/MinVoltageCellId'] = MinVoltageCellId
+            # send temperature
+            bus['/Dc/0/Temperature'] = Temperature
+            bus['/System/MaxCellTemperature'] = MaxCellTemp
+            bus['/System/MinCellTemperature'] = MinCellTemp
         
-        # send battery state
-        self._dbusservice['/System/NrOfCellsPerBattery'] = NrOfCellsPerBattery
-        self._dbusservice['/System/NrOfModulesOnline'] = NrOfModulesOnline
-        self._dbusservice['/System/NrOfModulesOffline'] = NrOfModulesOffline
-        self._dbusservice['/System/NrOfModulesBlockingCharge'] = NrOfModulesBlockingCharge
-        self._dbusservice['/System/NrOfModulesBlockingDischarge'] = NrOfModulesBlockingDischarge
+            # send cell min/max voltage
+            bus['/System/MaxCellVoltage'] = MaxCellVoltage
+            bus['/System/MaxVoltageCellId'] = MaxVoltageCellId
+            bus['/System/MinCellVoltage'] = MinCellVoltage
+            bus['/System/MinVoltageCellId'] = MinVoltageCellId
         
-        # send alarms
-        self._dbusservice['/Alarms/LowVoltage'] = LowVoltage_alarm
-        self._dbusservice['/Alarms/HighVoltage'] = HighVoltage_alarm
-        self._dbusservice['/Alarms/LowCellVoltage'] = LowCellVoltage_alarm
-        #self._dbusservice['/Alarms/HighCellVoltage'] = HighCellVoltage_alarm   # not implemended in Venus
-        self._dbusservice['/Alarms/LowSoc'] = LowSoc_alarm
-        self._dbusservice['/Alarms/HighChargeCurrent'] = HighChargeCurrent_alarm
-        self._dbusservice['/Alarms/HighDischargeCurrent'] = HighDischargeCurrent_alarm
-        self._dbusservice['/Alarms/CellImbalance'] = CellImbalance_alarm
-        self._dbusservice['/Alarms/InternalFailure'] = InternalFailure_alarm
-        self._dbusservice['/Alarms/HighChargeTemperature'] = HighChargeTemperature_alarm
-        self._dbusservice['/Alarms/LowChargeTemperature'] = LowChargeTemperature_alarm
-        self._dbusservice['/Alarms/HighTemperature'] = HighChargeTemperature_alarm
-        self._dbusservice['/Alarms/LowTemperature'] = LowChargeTemperature_alarm
+            # send battery state
+            bus['/System/NrOfCellsPerBattery'] = NrOfCellsPerBattery
+            bus['/System/NrOfModulesOnline'] = NrOfModulesOnline
+            bus['/System/NrOfModulesOffline'] = NrOfModulesOffline
+            bus['/System/NrOfModulesBlockingCharge'] = NrOfModulesBlockingCharge
+            bus['/System/NrOfModulesBlockingDischarge'] = NrOfModulesBlockingDischarge
         
-        # send charge/discharge control
-        self._dbusservice['/Info/MaxChargeCurrent'] = MaxChargeCurrent
-        self._dbusservice['/Info/MaxDischargeCurrent'] = MaxDischargeCurrent
-        self._dbusservice['/Info/MaxChargeVoltage'] = MaxChargeVoltage
+            # send alarms
+            bus['/Alarms/LowVoltage'] = LowVoltage_alarm
+            bus['/Alarms/HighVoltage'] = HighVoltage_alarm
+            bus['/Alarms/LowCellVoltage'] = LowCellVoltage_alarm
+            #bus['/Alarms/HighCellVoltage'] = HighCellVoltage_alarm   # not implemended in Venus
+            bus['/Alarms/LowSoc'] = LowSoc_alarm
+            bus['/Alarms/HighChargeCurrent'] = HighChargeCurrent_alarm
+            bus['/Alarms/HighDischargeCurrent'] = HighDischargeCurrent_alarm
+            bus['/Alarms/CellImbalance'] = CellImbalance_alarm
+            bus['/Alarms/InternalFailure'] = InternalFailure_alarm
+            bus['/Alarms/HighChargeTemperature'] = HighChargeTemperature_alarm
+            bus['/Alarms/LowChargeTemperature'] = LowChargeTemperature_alarm
+            bus['/Alarms/HighTemperature'] = HighChargeTemperature_alarm
+            bus['/Alarms/LowTemperature'] = LowChargeTemperature_alarm
+        
+            # send charge/discharge control
+            bus['/Info/MaxChargeCurrent'] = MaxChargeCurrent
+            bus['/Info/MaxDischargeCurrent'] = MaxDischargeCurrent
+            bus['/Info/MaxChargeVoltage'] = MaxChargeVoltage
 
         return True
 
