@@ -116,9 +116,10 @@ class DbusAggBatService(object):
         batteriesCount = 0
         logging.info('%s: Scan of batteries: Trial Nr. %d' % (dt.now(),(self._scanTrials + 1)))
         for service in self._dbusConn.list_names():
-            if (SERVICE_KEY_WORD in service) and (not('SmartShunt' in service)):
-                self._batteries.append(service)
-                batteriesCount += 1 
+            if SERVICE_KEY_WORD in service:
+                if PRODUCT_NAME_KEY_WORD in (VeDbusItemImport(self._dbusConn, service, '/ProductName').get_value()):
+                    self._batteries.append(service)
+                    batteriesCount += 1 
         logging.info('%s: %d batteries found.' % (dt.now(), batteriesCount))
         if batteriesCount == NR_OF_BATTERIES:
             GLib.timeout_add(1000, self._update)
