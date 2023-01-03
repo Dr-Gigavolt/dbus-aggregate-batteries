@@ -275,12 +275,15 @@ class DbusAggBatService(object):
         
         # manage charge voltage       
         if MaxCellVoltage >= MAX_CELL_VOLTAGE:
-            MaxChargeVoltage = Voltage                          # clamp the voltage to the current value if one cell goes too high
+            MaxChargeVoltage = Voltage - (MaxCellVoltage - MAX_CELL_VOLTAGE)                          # clamp the voltage to the current value if one cell goes too high
         else:     
             MaxChargeVoltage = CHARGE_VOLTAGE * NrOfCellsPerBattery
        
         # manage charge current
-        if (MaxCellVoltage >= CV2):                             # CV2 > CV1
+        if (MaxCellVoltage >= MAX_CELL_VOLTAGE) or (NrOfModulesBlockingCharge > 0):                         
+            MaxChargeCurrent = 0
+        
+        elif (MaxCellVoltage >= CV2):                             # CV2 > CV1
             MaxChargeCurrent = MAX_CHARGE_CURRENT_ABOVE_CV2
         
         elif (MaxCellVoltage >= CV1):
@@ -289,7 +292,7 @@ class DbusAggBatService(object):
         else:
             MaxChargeCurrent = MAX_CHARGE_CURRENT
         
-        if (Voltage <= DISCHARGE_VOLTAGE * NrOfCellsPerBattery) or (MinCellVoltage <= MIN_CELL_VOLTAGE):
+        if (Voltage <= DISCHARGE_VOLTAGE * NrOfCellsPerBattery) or (MinCellVoltage <= MIN_CELL_VOLTAGE) or (NrOfModulesBlockingDischarge > 0):
             MaxDischargeCurrent = 0
         else:
             MaxDischargeCurrent = MAX_DISCHARGE_CURRENT
