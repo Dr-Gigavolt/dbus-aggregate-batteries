@@ -29,31 +29,28 @@ For debugging (to see the error messages in the console) it is reasonable to ren
 Function:
 
 on start, search for:
-	- all batteries: services containing BATTERY_KEY_WORD in their names and BATTERY_NAME_KEY_WORD (to differentiate between battery and SmartShunt) in their product names
-	- if a SmartShunt is found, is remembered and can be taken into account as DC load in case of own DC current measurement
-	- service (only one) containing MULTI_KEY_WORD in its name - Multi or Quattro or cluster of them for DC current measurement
-	- all services containing MPPT_KEY_WORD - SmartSolars and BlueSolars for DC current measurement. MPPT RS not tested.	
+- all batteries: services containing BATTERY_KEY_WORD in their names and BATTERY_NAME_KEY_WORD (to differentiate between battery and SmartShunt) in their product names
+- if a SmartShunt is found, is remembered and can be taken into account as DC load in case of own DC current measurement
+- service (only one) containing MULTI_KEY_WORD in its name - Multi or Quattro or cluster of them for DC current measurement
+- all services containing MPPT_KEY_WORD - SmartSolars and BlueSolars for DC current measurement. MPPT RS not tested.	
 every second:
-	- data of all batteries are collected
-	- data are merged, e.g. average voltage, sum of currents, average of SoC, cells with absolute minimum and maximum voltage etc., see the code for details
-	- own Coulumb counter is updated
-	- own charge/discharge parameters (max. charge voltage and max. charge and discharge current) are calculated
-	- if CURRENT_FROM_VICTRON = True: DC current measurement from Multis/Quattros and MPPTs is used instead of BMS current measurement (reasonable e.g. in case of JK BMS with poor accuracy)
-	- if DC_LOADS = True: SmartShunt enabled to measure DC consumption. Set INVERT_SMARTSHUNT = True to change its polarity
-	- OWN_SOC = True: Own Coulumb counter is used instead of the one in BMS
-	- OWN_CHARGE_PARAMETERS = True: Calculate own max. charge voltage and max. charge and discharge currents. Othervise merged values from SerialBattery instances are transmitted.	
-	- new data are published on Dbus as a single virtual battery
+- data of all batteries are collected
+- data are merged, e.g. average voltage, sum of currents, average of SoC, cells with absolute minimum and maximum voltage etc., see the code for details
+- own Coulumb counter is updated
+- own charge/discharge parameters (max. charge voltage and max. charge and discharge current) are calculated
+- if CURRENT_FROM_VICTRON = True: DC current measurement from Multis/Quattros and MPPTs is used instead of BMS current measurement (reasonable e.g. in case of JK BMS with poor accuracy)
+- if DC_LOADS = True: SmartShunt enabled to measure DC consumption. Set INVERT_SMARTSHUNT = True to change its polarity
+- OWN_SOC = True: Own Coulumb counter is used instead of the one in BMS
+- OWN_CHARGE_PARAMETERS = True: Calculate own max. charge voltage and max. charge and discharge currents. Othervise merged values from SerialBattery instances are transmitted.	
+- new data are published on Dbus as a single virtual battery
 
 dbusmonitor defined in dbusmon.py is used instead of VeDbusItemImport which was very ressource hungry (since V2.0)	
 	
 Calculation of own charge/discharge parameters:
 	
-- The max. charge voltage is either set to (CHARGE_VOLTAGE * Nr. of cells) or is limited in order not to exceed the MAX_CELL_VOLTAGE. This avoids emergency disconnecting the battery by its BMS.    
-	
+- The max. charge voltage is either set to (CHARGE_VOLTAGE * Nr. of cells) or is limited in order not to exceed the MAX_CELL_VOLTAGE. This avoids emergency disconnecting the battery by its BMS.    	
 - The MaxChargeCurrent is reduced from MAX_CHARGE_CURRENT to MAX_CHARGE_CURRENT_ABOVE_CV1 when the first cell reaches CV1 and further reduced to MAX_CHARGE_CURRENT_ABOVE_CV2 when the first cell reaches CV2.
-
-- The MaxDischargeCurrent is reduced from MAX_DISCHARGE_CURRENT to zero if the battery voltage falls down to (DISCHARGE_VOLTAGE * Nr. of cells)
-or the first cell falls down to MIN_CELL_VOLTAGE.
+- The MaxDischargeCurrent is reduced from MAX_DISCHARGE_CURRENT to zero if the battery voltage falls down to (DISCHARGE_VOLTAGE * Nr. of cells) or the first cell falls down to MIN_CELL_VOLTAGE.
 
 The charge or discharge current is set to zero if at least one BMS is blocking charge or discharge respectively.
 
