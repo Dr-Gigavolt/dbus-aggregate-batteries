@@ -362,9 +362,9 @@ class DbusAggBatService(object):
                 
                 # Charge/discharge parameters, only if needed
                 if not OWN_CHARGE_PARAMETERS:
-                    MaxChargeCurrent += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeCurrent').get_value()                    # sum of max. charge currents
-                    MaxDischargeCurrent += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxDischargeCurrent').get_value()              # sum of max. discharge currents
-                    MaxChargeVoltage.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeVoltage').get_value())               # list of max. charge voltages for maximum
+                    MaxChargeCurrent += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeCurrent')                                # sum of max. charge currents
+                    MaxDischargeCurrent += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxDischargeCurrent')                          # sum of max. discharge currents
+                    MaxChargeVoltage.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeVoltage')                            # list of max. charge voltages for maximum
                
         except Exception:
             self._readTrials += 1
