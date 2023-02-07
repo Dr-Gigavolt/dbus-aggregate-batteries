@@ -81,9 +81,9 @@ class DbusAggBatService(object):
         #self._dbusservice.add_path('/System/MaxTemperatureCellId', None, writeable=True)       
         
         # Create extras paths
-        self._dbusservice.add_path('/System/MinCellVoltage', None, writeable=True)
+        self._dbusservice.add_path('/System/MinCellVoltage', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
         self._dbusservice.add_path('/System/MinVoltageCellId', None, writeable=True)
-        self._dbusservice.add_path('/System/MaxCellVoltage', None, writeable=True)
+        self._dbusservice.add_path('/System/MaxCellVoltage', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
         self._dbusservice.add_path('/System/MaxVoltageCellId', None, writeable=True)
         self._dbusservice.add_path('/System/NrOfCellsPerBattery', None, writeable=True)
         self._dbusservice.add_path('/System/NrOfModulesOnline', None, writeable=True)
@@ -107,9 +107,9 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Alarms/LowTemperature', None, writeable=True)
 
         # Create voltage paths
-        self._dbusservice.add_path('/Voltages/Diff', None, writeable=True)
+        self._dbusservice.add_path('/Voltages/Diff', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
         for cellId in range(1, (NR_OF_BATTERIES * NR_OF_CELLS_PER_BATTERIE) + 1):
-            self._dbusservice.add_path('/Voltages/Cell%d' % cellId, None, writeable=True)
+            self._dbusservice.add_path('/Voltages/Cell%d' % cellId, None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
 
         # Create control paths
         self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
