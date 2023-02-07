@@ -28,7 +28,7 @@ from dbusmon import DbusMon
 from threading import Thread
 
 sys.path.append('/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')
-from vedbus import VeDbusService
+from vedbus import VeDbusService, VeDbusItemImport
 
 class DbusAggBatService(object):
     
@@ -108,6 +108,8 @@ class DbusAggBatService(object):
 
         # Create voltage paths
         self._dbusservice.add_path('/Voltages/Diff', None, writeable=True)
+        for cellId in range(1, (NR_OF_BATTERIES * NR_OF_CELLS_PER_BATTERIE) + 1):
+            self._dbusservice.add_path('/Voltages/Cell%d' % cellId, None, writeable=True)
 
         # Create control paths
         self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
@@ -272,7 +274,8 @@ class DbusAggBatService(object):
         NrOfModulesOffline = 0
         NrOfModulesBlockingCharge = 0
         NrOfModulesBlockingDischarge = 0
-        
+        CellVoltages = []
+
         # Alarms
         LowVoltage_alarm = []           # lists to find maxima
         HighVoltage_alarm = []
@@ -330,7 +333,11 @@ class DbusAggBatService(object):
                 = self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/MaxCellVoltage')                                                      # append dictionary by the cell ID and its max. voltage
                 MinCellVoltage['%s_%s' % (BatteryName, self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/MinVoltageCellId'))]\
                 = self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/MinCellVoltage')                                                      # append dictionary by the cell ID and its max. voltage
-                    
+
+                # Cell valtages
+                for cellId in range(1, NrOfCellsPerBattery[i] + 1):
+                    CellVoltages.append(VeDbusItemImport(self._dbusConn, self._batteries[i], '/Voltages/Cell%d' % cellId).get_value())
+
                 # Battery state
                 NrOfCellsPerBattery.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfCellsPerBattery'))                       # append list of nr. of cells                 
                 NrOfModulesOnline += self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfModulesOnline')                                # sum of modules online
@@ -568,6 +575,8 @@ class DbusAggBatService(object):
 
             # send voltages
             bus['/Voltages/Diff'] = VoltagesDiff
+            for cellId in range(1, (NR_OF_BATTERIES * NR_OF_CELLS_PER_BATTERIE) + 1):
+                bus['/Voltages/Cell%d' % cellId] = CellVoltages[cellId - 1]
 
             # send alarms
             bus['/Alarms/LowVoltage'] = LowVoltage_alarm
