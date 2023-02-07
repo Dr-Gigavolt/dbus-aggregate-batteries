@@ -105,7 +105,10 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Alarms/LowChargeTemperature', None, writeable=True)
         self._dbusservice.add_path('/Alarms/HighTemperature', None, writeable=True)
         self._dbusservice.add_path('/Alarms/LowTemperature', None, writeable=True)
-        
+
+        # Create voltage paths
+        self._dbusservice.add_path('/Voltages/Diff', None, writeable=True)
+
         # Create control paths
         self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
         self._dbusservice.add_path('/Info/MaxDischargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
@@ -384,7 +387,10 @@ class DbusAggBatService(object):
         MaxCellVoltage = MaxCellVoltage[MaxVoltageCellId]
         MinVoltageCellId = min(MinCellVoltage, key = MinCellVoltage.get)
         MinCellVoltage = MinCellVoltage[MinVoltageCellId]
-        
+
+        # calculate voltage diff
+        VoltagesDiff = round(MaxCellVoltage - MinCellVoltage, 3)
+
         # find max and min cell temperature (have no ID)
         MaxCellTemp = self._max(MaxCellTemperature)
         MinCellTemp = self._min(MinCellTemperature)
@@ -559,7 +565,10 @@ class DbusAggBatService(object):
             bus['/System/NrOfModulesOffline'] = NrOfModulesOffline
             bus['/System/NrOfModulesBlockingCharge'] = NrOfModulesBlockingCharge
             bus['/System/NrOfModulesBlockingDischarge'] = NrOfModulesBlockingDischarge
-        
+
+            # send voltages
+            bus['/Voltages/Diff'] = VoltagesDiff
+
             # send alarms
             bus['/Alarms/LowVoltage'] = LowVoltage_alarm
             bus['/Alarms/HighVoltage'] = HighVoltage_alarm
