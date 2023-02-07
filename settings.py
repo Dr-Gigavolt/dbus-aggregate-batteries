@@ -21,6 +21,7 @@ CHARGE_SAVE_PRECISION = 0.0025                          # Trade-off between save
 OWN_CHARGE_PARAMETERS = True                            # Calculate own charge/discharge control parameters (True) from following settings
                                                         # or use them from battery driver (False)
 CHARGE_VOLTAGE = 2.5                                    # Constant voltage charge = this value * nr. of cells
+MAX_VOLTAGE_DIFF = 0.01                                 # Max precision for MPPTs are 10mV (used for dynamic reducing MaxChargeVoltage) CHARGE_VOLTAGE must set to 'dynamic'
 MAX_CELL_VOLTAGE = 2.53                                 # If reached by 1-st cell, the charger voltage is clamped to the measured value
 DISCHARGE_VOLTAGE = 2.0                                 # If reached, discharge current set to zero
 MIN_CELL_VOLTAGE = 1.9                                  # If reached, discharge current set to zero
