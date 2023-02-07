@@ -453,7 +453,7 @@ class DbusAggBatService(object):
                         MaxChargeVoltage = MAX_BATTERY_VOLAGE                                   # all cells at 100% SoC (for given maxcv), balancer has to bleed x from cells above maxcv
                         self._ownCharge = InstalledCapacity
 
-                if self._dbusservice['/System/MaxCellVoltage'] > MAX_CELL_VOLTAGE + MAX_VOLTAGE_DIFF:
+                if MaxCellVoltage > MAX_CELL_VOLTAGE + MAX_VOLTAGE_DIFF:
                     MaxChargeVoltage = Voltage                                                  # just in case - balancer could not cope with current, pause charging
             else:
                 if (Voltage >= CHARGE_VOLTAGE * NrOfCellsPerBattery):
