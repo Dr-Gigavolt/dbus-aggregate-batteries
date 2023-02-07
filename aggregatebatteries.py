@@ -439,15 +439,31 @@ class DbusAggBatService(object):
         
         if OWN_CHARGE_PARAMETERS:                                                           
             
-            # manage charge voltage       
-            if (Voltage >= CHARGE_VOLTAGE * NrOfCellsPerBattery):
-                self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
-            
-            if MaxCellVoltage >= MAX_CELL_VOLTAGE:
-                MaxChargeVoltage = Voltage - (MaxCellVoltage - MAX_CELL_VOLTAGE)            # avoid exceeding MAX_CELL_VOLTAGE
-                self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
-            else:     
-                MaxChargeVoltage = CHARGE_VOLTAGE * NrOfCellsPerBattery
+            # manage charge voltage
+            if CHARGE_VOLTAGE == 'dynamic':
+                MAX_BATTERY_VOLAGE = MAX_CELL_VOLTAGE * NrOfCellsPerBattery
+
+                if MaxCellVoltage <= MAX_CELL_VOLTAGE:
+                    MaxChargeVoltage = MAX_BATTERY_VOLAGE + MAX_VOLTAGE_DIFF                    # not there yet, charge with slightly higher voltage to get that current flowing
+
+                if MaxCellVoltage > MAX_CELL_VOLTAGE:
+                    if MinCellVoltage < MAX_CELL_VOLTAGE:
+                        MaxChargeVoltage = Voltage + MAX_VOLTAGE_DIFF                           # balancing, highest cell can't exceed mcv+x, lower cells can catch up
+                    else:
+                        MaxChargeVoltage = MAX_BATTERY_VOLAGE                                   # all cells at 100% SoC (for given maxcv), balancer has to bleed x from cells above maxcv
+                        self._ownCharge = InstalledCapacity
+
+                if self._dbusservice['/System/MaxCellVoltage'] > MAX_CELL_VOLTAGE + MAX_VOLTAGE_DIFF:
+                    MaxChargeVoltage = Voltage                                                  # just in case - balancer could not cope with current, pause charging
+            else:
+                if (Voltage >= CHARGE_VOLTAGE * NrOfCellsPerBattery):
+                    self._ownCharge = InstalledCapacity        	       	       	       	       	# reset Coulumb counter to 100%
+ 
+                if MaxCellVoltage >= MAX_CELL_VOLTAGE:
+                    MaxChargeVoltage = Voltage - (MaxCellVoltage - MAX_CELL_VOLTAGE)            # avoid exceeding MAX_CELL_VOLTAGE
+                    self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
+                else:
+                    MaxChargeVoltage = CHARGE_VOLTAGE * NrOfCellsPerBattery
        
             # manage charge current
             if (MaxCellVoltage >= MAX_CELL_VOLTAGE) or (NrOfModulesBlockingCharge > 0):                         
