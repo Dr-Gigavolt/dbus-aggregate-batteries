@@ -1,6 +1,7 @@
 # Version 2.0
 
 NR_OF_BATTERIES = 2                                     # Nr. of physical batteries to be aggregated
+NR_OF_CELLS_PER_BATTERIE = 16                           # Nr. of cells in a single batterie
 NR_OF_MPPTS = 1                                         # Nr. of MPPTs
 
 BATTERY_KEY_WORD = 'com.victronenergy.battery.tty'      # Key world to identify services of physical Serial Batteries
