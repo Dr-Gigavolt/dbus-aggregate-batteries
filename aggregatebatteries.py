@@ -28,7 +28,7 @@ from dbusmon import DbusMon
 from threading import Thread
 
 sys.path.append('/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')
-from vedbus import VeDbusService
+from vedbus import VeDbusService, VeDbusItemImport
 
 class DbusAggBatService(object):
     
@@ -81,9 +81,9 @@ class DbusAggBatService(object):
         #self._dbusservice.add_path('/System/MaxTemperatureCellId', None, writeable=True)       
         
         # Create extras paths
-        self._dbusservice.add_path('/System/MinCellVoltage', None, writeable=True)
+        self._dbusservice.add_path('/System/MinCellVoltage', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
         self._dbusservice.add_path('/System/MinVoltageCellId', None, writeable=True)
-        self._dbusservice.add_path('/System/MaxCellVoltage', None, writeable=True)
+        self._dbusservice.add_path('/System/MaxCellVoltage', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
         self._dbusservice.add_path('/System/MaxVoltageCellId', None, writeable=True)
         self._dbusservice.add_path('/System/NrOfCellsPerBattery', None, writeable=True)
         self._dbusservice.add_path('/System/NrOfModulesOnline', None, writeable=True)
@@ -105,7 +105,12 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Alarms/LowChargeTemperature', None, writeable=True)
         self._dbusservice.add_path('/Alarms/HighTemperature', None, writeable=True)
         self._dbusservice.add_path('/Alarms/LowTemperature', None, writeable=True)
-        
+
+        # Create voltage paths
+        self._dbusservice.add_path('/Voltages/Diff', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
+        for cellId in range(1, (NR_OF_BATTERIES * NR_OF_CELLS_PER_BATTERIE) + 1):
+            self._dbusservice.add_path('/Voltages/Cell%d' % cellId, None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
+
         # Create control paths
         self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
         self._dbusservice.add_path('/Info/MaxDischargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
@@ -269,7 +274,8 @@ class DbusAggBatService(object):
         NrOfModulesOffline = 0
         NrOfModulesBlockingCharge = 0
         NrOfModulesBlockingDischarge = 0
-        
+        CellVoltages = []
+
         # Alarms
         LowVoltage_alarm = []           # lists to find maxima
         HighVoltage_alarm = []
@@ -327,7 +333,11 @@ class DbusAggBatService(object):
                 = self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/MaxCellVoltage')                                                      # append dictionary by the cell ID and its max. voltage
                 MinCellVoltage['%s_%s' % (BatteryName, self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/MinVoltageCellId'))]\
                 = self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/MinCellVoltage')                                                      # append dictionary by the cell ID and its max. voltage
-                    
+
+                # Cell valtages
+                for cellId in range(1, NrOfCellsPerBattery[i] + 1):
+                    CellVoltages.append(VeDbusItemImport(self._dbusConn, self._batteries[i], '/Voltages/Cell%d' % cellId).get_value())
+
                 # Battery state
                 NrOfCellsPerBattery.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfCellsPerBattery'))                       # append list of nr. of cells                 
                 NrOfModulesOnline += self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfModulesOnline')                                # sum of modules online
@@ -352,9 +362,9 @@ class DbusAggBatService(object):
                 
                 # Charge/discharge parameters, only if needed
                 if not OWN_CHARGE_PARAMETERS:
-                    MaxChargeCurrent += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeCurrent').get_value()                    # sum of max. charge currents
-                    MaxDischargeCurrent += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxDischargeCurrent').get_value()              # sum of max. discharge currents
-                    MaxChargeVoltage.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeVoltage').get_value())               # list of max. charge voltages for maximum
+                    MaxChargeCurrent += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeCurrent')                                # sum of max. charge currents
+                    MaxDischargeCurrent += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxDischargeCurrent')                          # sum of max. discharge currents
+                    MaxChargeVoltage.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeVoltage')                            # list of max. charge voltages for maximum
                
         except Exception:
             self._readTrials += 1
@@ -384,7 +394,10 @@ class DbusAggBatService(object):
         MaxCellVoltage = MaxCellVoltage[MaxVoltageCellId]
         MinVoltageCellId = min(MinCellVoltage, key = MinCellVoltage.get)
         MinCellVoltage = MinCellVoltage[MinVoltageCellId]
-        
+
+        # calculate voltage diff
+        VoltagesDiff = round(MaxCellVoltage - MinCellVoltage, 3)
+
         # find max and min cell temperature (have no ID)
         MaxCellTemp = self._max(MaxCellTemperature)
         MinCellTemp = self._min(MinCellTemperature)
@@ -439,15 +452,31 @@ class DbusAggBatService(object):
         
         if OWN_CHARGE_PARAMETERS:                                                           
             
-            # manage charge voltage       
-            if (Voltage >= CHARGE_VOLTAGE * NrOfCellsPerBattery):
-                self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
-            
-            if MaxCellVoltage >= MAX_CELL_VOLTAGE:
-                MaxChargeVoltage = Voltage - (MaxCellVoltage - MAX_CELL_VOLTAGE)            # avoid exceeding MAX_CELL_VOLTAGE
-                self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
-            else:     
-                MaxChargeVoltage = CHARGE_VOLTAGE * NrOfCellsPerBattery
+            # manage charge voltage
+            if CHARGE_VOLTAGE == 'dynamic':
+                MAX_BATTERY_VOLAGE = MAX_CELL_VOLTAGE * NrOfCellsPerBattery
+
+                if MaxCellVoltage <= MAX_CELL_VOLTAGE:
+                    MaxChargeVoltage = MAX_BATTERY_VOLAGE + MAX_VOLTAGE_DIFF                    # not there yet, charge with slightly higher voltage to get that current flowing
+
+                if MaxCellVoltage > MAX_CELL_VOLTAGE:
+                    if MinCellVoltage < MAX_CELL_VOLTAGE:
+                        MaxChargeVoltage = Voltage + MAX_VOLTAGE_DIFF                           # balancing, highest cell can't exceed mcv+x, lower cells can catch up
+                    else:
+                        MaxChargeVoltage = MAX_BATTERY_VOLAGE                                   # all cells at 100% SoC (for given maxcv), balancer has to bleed x from cells above maxcv
+                        self._ownCharge = InstalledCapacity
+
+                if MaxCellVoltage > MAX_CELL_VOLTAGE + MAX_VOLTAGE_DIFF:
+                    MaxChargeVoltage = Voltage                                                  # just in case - balancer could not cope with current, pause charging
+            else:
+                if (Voltage >= CHARGE_VOLTAGE * NrOfCellsPerBattery):
+                    self._ownCharge = InstalledCapacity        	       	       	       	       	# reset Coulumb counter to 100%
+ 
+                if MaxCellVoltage >= MAX_CELL_VOLTAGE:
+                    MaxChargeVoltage = Voltage - (MaxCellVoltage - MAX_CELL_VOLTAGE)            # avoid exceeding MAX_CELL_VOLTAGE
+                    self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
+                else:
+                    MaxChargeVoltage = CHARGE_VOLTAGE * NrOfCellsPerBattery
        
             # manage charge current
             if (MaxCellVoltage >= MAX_CELL_VOLTAGE) or (NrOfModulesBlockingCharge > 0):                         
@@ -543,7 +572,12 @@ class DbusAggBatService(object):
             bus['/System/NrOfModulesOffline'] = NrOfModulesOffline
             bus['/System/NrOfModulesBlockingCharge'] = NrOfModulesBlockingCharge
             bus['/System/NrOfModulesBlockingDischarge'] = NrOfModulesBlockingDischarge
-        
+
+            # send voltages
+            bus['/Voltages/Diff'] = VoltagesDiff
+            for cellId in range(1, (NR_OF_BATTERIES * NR_OF_CELLS_PER_BATTERIE) + 1):
+                bus['/Voltages/Cell%d' % cellId] = CellVoltages[cellId - 1]
+
             # send alarms
             bus['/Alarms/LowVoltage'] = LowVoltage_alarm
             bus['/Alarms/HighVoltage'] = HighVoltage_alarm
