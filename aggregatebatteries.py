@@ -423,7 +423,7 @@ class DbusAggBatService(object):
                 Current = self._dbusMon.dbusmon.get_value(self._multi, '/Dc/0/Current')                          # get DC current of multi/quattro (or system of them)
                 for i in range(NR_OF_MPPTS):
                     Current += self._dbusMon.dbusmon.get_value(self._mppts[i], '/Dc/0/Current')                  # add DC current of all MPPTs (if present)          
-                    Power = Voltage * Current                                                                    # calculate own power (not read from BMS)
+                Power = Voltage * Current                                                                        # calculate own power (not read from BMS)
                 if DC_LOADS:
                     if INVERT_SMARTSHUNT:
                         Current += self._dbusMon.dbusmon.get_value(self._smartShunt, '/Dc/0/Current')            # SmartShunt is monitored as a battery
