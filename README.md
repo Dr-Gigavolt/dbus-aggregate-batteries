@@ -22,7 +22,9 @@ Installation:
 
 The service starts automatically after start/restart of the Venus OS. After changing of aggregatebatteries.py, dbusmon.py or settings.py restart it by executing:
 
-sh restart - it kills the service which starts automatically again.
+sh restart - it kills the service which starts automatically again
+sh restart_dbus-serial-battery - the same for all instances of the battery driver
+sh restart_all - the same for both, battery driver and AggregateBatteries
 
 For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: python3 aggregatebatteries.py
 
@@ -48,14 +50,11 @@ dbusmonitor defined in dbusmon.py is used instead of VeDbusItemImport which was 
 	
 Calculation of own charge/discharge parameters:
 	
-- The max. charge voltage is either set to (CHARGE_VOLTAGE * Nr. of cells) or is limited in order not to exceed the MAX_CELL_VOLTAGE. This avoids emergency disconnecting the battery by its BMS.    	
-- The MaxChargeCurrent is reduced from MAX_CHARGE_CURRENT to MAX_CHARGE_CURRENT_ABOVE_CV1 when the first cell reaches CV1 and further reduced to MAX_CHARGE_CURRENT_ABOVE_CV2 when the first cell reaches CV2.
-- The MaxDischargeCurrent is reduced from MAX_DISCHARGE_CURRENT to zero if the battery voltage falls down to (DISCHARGE_VOLTAGE * Nr. of cells) or the first cell falls down to MIN_CELL_VOLTAGE.
+- The max. charge voltage is either set to (CHARGE_VOLTAGE * Nr. of cells) or is limited in order not to exceed the MAX_CELL_VOLTAGE. This avoids emergency disconnecting the battery by its BMS. The limited charge voltage is calculated by subtracting the sum of all cell overvoltages (above MAX_CELL_VOLTAGE) and a margin VOLTAGE_SET_PRECISION from the sum of all cell voltages. This is done for all batteries and the minimum is taken.    	
+- The MaxChargeCurrent and MaxDischargeCurrent are linear interpolated between given points in lists (see settings.py for details).
 
-The charge or discharge current is set to zero if at least one BMS is blocking charge or discharge respectively.
+The charge or discharge current is set to zero if at least one BMS is blocking charge or discharge respectively. Here is a trouble with the commit #393 of SerialBattery - the blocking charge/discharge is set always by the SerialBattery driver, even if everything in config is set false - the state of the BMS-es is not forwarded any more. To avoid it (if you wish to use OWN_CHARGE_PARAMETERS = True) the setting of SerialBattery must be more liberal then the setting of AggregateBatteries.
 
 Logging file:
 ./service/aggregatebatteries.log	
 
-Known issue:
-- the last data from dbus-serialbattery driver remain on Dbus if the connection is interrupted. Therefore AggregateBatteries cannot recognize it as well.

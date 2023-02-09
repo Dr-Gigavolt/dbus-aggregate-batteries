@@ -1,0 +1,4 @@
+#!/bin/bash
+kill $(pgrep -f 'python /opt/victronenergy/dbus-serialbattery/dbus-serialbattery.py')
+kill $(pgrep -f 'python3 /data/dbus-aggregate-batteries/aggregatebatteries.py')
+
