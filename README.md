@@ -1,6 +1,6 @@
-This is a service for Victron Venus OS to collect the data from multiple parallel-connected batteries using https://github.com/Louisvdw/dbus-serialbattery driver, merge them and publish as a single virtual battery to Dbus.
- 
+This is a service for Victron Venus OS to collect the data from multiple parallel-connected batteries using https://github.com/Louisvdw/dbus-serialbattery driver, merge them and publish as a single virtual battery to Dbus. 
 It could serve at least as a temporary solution for https://github.com/Louisvdw/dbus-serialbattery/issues/8
+I recommend to use with this commit of dbus-serialbattery: https://github.com/Louisvdw/dbus-serialbattery/tree/3685d15a5d1ba801867bbdb98f57fd805ea2c24a/etc/dbus-serialbattery 
 
 Attention: This is my first experience with the Victron system and this software is not tested properly yet. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. 
 

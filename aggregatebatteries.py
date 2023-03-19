@@ -14,7 +14,7 @@ https://github.com/victronenergy/venus/wiki/dbus
 https://github.com/victronenergy/velib_python
 """
 
-VERSION = '2.1'
+VERSION = '2.2'
 
 from gi.repository import GLib
 import logging
@@ -155,7 +155,7 @@ class DbusAggBatService(object):
                     elif SMARTSHUNT_NAME_KEY_WORD in productName:           # if SmartShunt found, can be used for DC load current
                         self._smartShunt = service
                     
-        except:
+        except Exception:
             pass
         logging.info('%s: %d batteries found.' % (dt.now(), batteriesCount))
         
@@ -187,7 +187,7 @@ class DbusAggBatService(object):
                 if MULTI_KEY_WORD in service:
                     self._multi = service
                     logging.info('%s: %s found.' % (dt.now(),(self._dbusMon.dbusmon.get_value(service, '/ProductName'))))
-        except:
+        except Exception:
             pass
             
         if (self._multi != None):        
@@ -220,7 +220,7 @@ class DbusAggBatService(object):
                     self._mppts.append(service)
                     logging.info('%s: %s found.' % (dt.now(),(self._dbusMon.dbusmon.get_value(service, '/ProductName'))))
                     mpptsCount += 1
-        except:
+        except Exception:
             pass
             
         logging.info('%s: %d MPPT(s) found.' % (dt.now(), mpptsCount))
@@ -309,9 +309,9 @@ class DbusAggBatService(object):
                 
                 # DC                                               
                 Voltage += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Voltage')                                                      # sum for average voltage
-                if not CURRENT_FROM_VICTRON:                                                                                                                # only if needed                                       
-                    Current += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Current')                                                  # sum of currents                                              
-                    Power += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Power')                                                      # sum of powers
+                #if not CURRENT_FROM_VICTRON:                                                                                                                # only if needed                                       
+                Current += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Current')                                                  # sum of currents                                              
+                Power += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Power')                                                      # sum of powers
                 
                 # Capacity                                               
                 InstalledCapacity += self._dbusMon.dbusmon.get_value(self._batteries[i], '/InstalledCapacity')                                       # sum of installed Ah capacities
@@ -342,7 +342,7 @@ class DbusAggBatService(object):
                 
                 for j in range (NrOfCellsPerBattery[i]):                                                                                             # make dictionary of all cell voltages        
                     cellVoltages['%s_Cell%d' % (BatteryName, j+1)] = self._dbusMon.dbusmon.get_value(self._batteries[i], '/Voltages/Cell%d' % (j+1))                        
-                    # to do: send to Dbus (or change format if this does not fit)
+                    # to do: send to Dbus
                 
                 # Alarms
                 LowVoltage_alarm.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Alarms/LowVoltage'))
@@ -443,18 +443,21 @@ class DbusAggBatService(object):
         
         if CURRENT_FROM_VICTRON:
             try:
-                Current = self._dbusMon.dbusmon.get_value(self._multi, '/Dc/0/Current')                          # get DC current of multi/quattro (or system of them)
+                Current_VE = self._dbusMon.dbusmon.get_value(self._multi, '/Dc/0/Current')                          # get DC current of multi/quattro (or system of them)
                 for i in range(NR_OF_MPPTS):
-                    Current += self._dbusMon.dbusmon.get_value(self._mppts[i], '/Dc/0/Current')                  # add DC current of all MPPTs (if present)          
-                Power = Voltage * Current                                                                        # calculate own power (not read from BMS)
+                    Current_VE += self._dbusMon.dbusmon.get_value(self._mppts[i], '/Dc/0/Current')                  # add DC current of all MPPTs (if present)          
+                
                 if DC_LOADS:
                     if INVERT_SMARTSHUNT:
-                        Current += self._dbusMon.dbusmon.get_value(self._smartShunt, '/Dc/0/Current')            # SmartShunt is monitored as a battery
+                        Current_VE += self._dbusMon.dbusmon.get_value(self._smartShunt, '/Dc/0/Current')            # SmartShunt is monitored as a battery
                     else:
-                        Current -= self._dbusMon.dbusmon.get_value(self._smartShunt, '/Dc/0/Current')
+                        Current_VE -= self._dbusMon.dbusmon.get_value(self._smartShunt, '/Dc/0/Current')
+                        
+                Current = Current_VE                                                                                # BMS current overwritten only if no exception raised
+                Power = Voltage * Current_VE                                                                        # calculate own power (not read from BMS)        
+            
             except Exception:
-                logging.error('%s: Victron current read error. Using BMS current and power instead.' % dt.now()) # the BMS values are not overwritten
-                pass        
+                logging.error('%s: Victron current read error. Using BMS current and power instead.' % dt.now())    # the BMS values are not overwritten       
         
         ####################################################################################################
         # Calculate own charge/discharge parameters (overwrite the values received from the SerialBattery) #
@@ -489,15 +492,15 @@ class DbusAggBatService(object):
         
         # write message if the max charging voltage or max. charging or discharging current changes
         if abs(MaxChargeVoltage - self._MaxChargeVoltage_old) >= LOG_VOLTAGE_CHANGE:
-            logging.info('%s: Max. charging voltage: %.1fV'  % (dt.now(), MaxChargeVoltage))
+            logging.info('%s: Max. charging voltage: %.1fV; Max. cell voltage: %.3fV'  % (dt.now(), MaxChargeVoltage, MaxCellVoltage))
             self._MaxChargeVoltage_old = MaxChargeVoltage           
         
         if abs(MaxChargeCurrent - self._MaxChargeCurrent_old) >= LOG_CURRENT_CHANGE:
-            logging.info('%s: Max. charging current: %.1fA Max. cell voltage: %.3fV'  % (dt.now(), MaxChargeCurrent, MaxCellVoltage))
+            logging.info('%s: Max. charging current: %.1fA; Max. cell voltage: %.3fV'  % (dt.now(), MaxChargeCurrent, MaxCellVoltage))
             self._MaxChargeCurrent_old = MaxChargeCurrent
 
         if abs(MaxDischargeCurrent - self._MaxDischargeCurrent_old) >= LOG_CURRENT_CHANGE:
-            logging.info('%s: Max. dircharging current: %.1fA Min. cell voltage: %.3fV'  % (dt.now(), MaxDischargeCurrent, MinCellVoltage))
+            logging.info('%s: Max. dircharging current: %.1fA; Min. cell voltage: %.3fV'  % (dt.now(), MaxDischargeCurrent, MinCellVoltage))
             self._MaxDischargeCurrent_old = MaxDischargeCurrent        
                
         ###########################################################
@@ -555,7 +558,7 @@ class DbusAggBatService(object):
             bus['/Voltages/Diff']= MaxCellVoltage - MinCellVoltage
             
             # to do: move the battery names detection outside of _update() function to execute only once
-            # and create paths dynamically: '/Voltages/%s_Cell%d' % (BatteryName, cellID) ... if it works, or somehow else to differentiate between batteries
+            # and create paths dynamically: '/Voltages/%s_Cell%d' % (BatteryName, cellID)
             #    bus['/Voltages/%s' % cellName] = cellVoltages[cellName]
         
             # send battery state
