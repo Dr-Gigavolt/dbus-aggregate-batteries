@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Version 2.0
+# Version 2.2
 
 import sys
 sys.path.append('/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')

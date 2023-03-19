@@ -1,4 +1,4 @@
-# Version 2.1
+# Version 2.2
 
 NR_OF_BATTERIES = 2                                     # Nr. of physical batteries to be aggregated
 NR_OF_MPPTS = 1                                         # Nr. of MPPTs
@@ -27,9 +27,9 @@ CHARGE_VOLTAGE = 2.5                                    # Constant voltage charg
 MAX_CELL_VOLTAGE = 2.53                                 # If reached by 1-st cell, the charger voltage is clamped to the measured value
 DISCHARGE_VOLTAGE = 2.0                                 # If reached, discharge current set to zero
 MIN_CELL_VOLTAGE = 1.9                                  # If reached, discharge current set to zero
-VOLTAGE_SET_PRECISION = 0.03                            # To be subtracted from the calculated max. charge voltage if MAX_CELL_VOLTAGE is exceeded
+VOLTAGE_SET_PRECISION = 0.04                            # To be subtracted from the calculated max. charge voltage if MAX_CELL_VOLTAGE is exceeded
 
-MAX_CHARGE_CURRENT = 200                                # Max. charge current at normal conditions
+MAX_CHARGE_CURRENT = 300                                # Max. charge current at normal conditions
 MAX_DISCHARGE_CURRENT = 200                             # Max. discharge current at normal conditions
 
 # settings limiting charge and discharge current if at least one cell gets full or empty
