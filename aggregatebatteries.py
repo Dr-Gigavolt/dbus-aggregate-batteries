@@ -454,7 +454,8 @@ class DbusAggBatService(object):
                     else:
                         Current_VE -= self._dbusMon.dbusmon.get_value(self._smartShunt, '/Dc/0/Current')
                         
-                Current = Current_VE                                                                                # BMS current overwritten only if no exception raised
+                if Current_VE is not None:
+	            Current = Current_VE                                                                            # BMS current overwritten only if no exception raised
                 Power = Voltage * Current_VE                                                                        # calculate own power (not read from BMS)        
             
             except Exception:
