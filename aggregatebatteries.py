@@ -456,7 +456,7 @@ class DbusAggBatService(object):
                         
                 if Current_VE is not None:
 	            Current = Current_VE                                                                            # BMS current overwritten only if no exception raised
-                Power = Voltage * Current_VE                                                                        # calculate own power (not read from BMS)        
+                    Power = Voltage * Current_VE                                                                    # calculate own power (not read from BMS)        
             
             except Exception:
                 logging.error('%s: Victron current read error. Using BMS current and power instead.' % dt.now())    # the BMS values are not overwritten       
