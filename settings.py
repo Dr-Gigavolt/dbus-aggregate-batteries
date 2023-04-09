@@ -9,7 +9,7 @@ BATTERY_NAME_PATH = '/CustomName'                       # What defines the batte
 #BATTERY_NAME_PATH = '/HardwareVersion'
 
 MULTI_KEY_WORD = 'com.victronenergy.vebus.tty'          # Key world to identify service of Multis/Quattros (or cluster of them)
-MPPT_KEY_WORD = 'com.victronenergy.solarcharger.tty'    # Key world to identify services of solar chargers (RS not tested, only SmartSolar)
+MPPT_KEY_WORD = 'com.victronenergy.solarcharger'    # Key world to identify services of solar chargers (RS not tested, only SmartSolar)
 SMARTSHUNT_NAME_KEY_WORD = 'SmartShunt'                 # Key world to identify services of SmartShunt (not tested) 
 
 SEARCH_TRIALS = 10                                      # Trials to identify of all batteries before exit and restart
