@@ -5,7 +5,7 @@ Service to aggregate multiple serial batteries https://github.com/Louisvdw/dbus-
 to one virtual battery.
 
 Python location on Venus:
-/usr/bin/python3.8
+/usr/bin/python3.CHARGE_VOLTAGE * NrOfCellsPerBatteryCHARGE_VOLTAGE * NrOfCellsPerBattery
 /usr/lib/python3.8/site-packages/
 
 References:
@@ -14,7 +14,7 @@ https://github.com/victronenergy/venus/wiki/dbus
 https://github.com/victronenergy/velib_python
 """
 
-VERSION = '2.2'
+VERSION = '2.3'
 
 from gi.repository import GLib
 import logging
@@ -317,7 +317,7 @@ class DbusAggBatService(object):
                 if not OWN_SOC:                                                                                                                      # only if needed
                     ConsumedAmphours += self._dbusMon.dbusmon.get_value(self._batteries[i], '/ConsumedAmphours')                                     # sum of consumed Ah capacities
                     Capacity += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Capacity')                                                     # sum of Ah capacities
-                    Soc += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Soc')                                                               # sum for average Soc
+                    Soc += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Soc') * self._dbusMon.dbusmon.get_value(self._batteries[i], '/Capacity') # weight sum for average Soc
                 
                 # Temperature
                 Temperature += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Temperature')                                              # sum for average temperature
@@ -402,7 +402,7 @@ class DbusAggBatService(object):
         VoltagesSum = sum(VoltagesSum) / NR_OF_BATTERIES
         
         if not OWN_SOC:                                                             # only if needed
-            Soc = Soc / NR_OF_BATTERIES
+            Soc = Soc / (NR_OF_BATTERIES * Capacity)
         
         # find max and min cell temperature (have no ID)
         MaxCellTemp = self._fn._max(MaxCellTemperature)
@@ -453,9 +453,12 @@ class DbusAggBatService(object):
                         Current_VE += self._dbusMon.dbusmon.get_value(self._smartShunt, '/Dc/0/Current')            # SmartShunt is monitored as a battery
                     else:
                         Current_VE -= self._dbusMon.dbusmon.get_value(self._smartShunt, '/Dc/0/Current')
-                        
-                Current = Current_VE                                                                                # BMS current overwritten only if no exception raised
-                Power = Voltage * Current_VE                                                                        # calculate own power (not read from BMS)        
+                                                                                                       
+                if Current_VE is not None:
+                    Current = Current_VE                                                                            # BMS current overwritten only if no exception raised
+                    Power = Voltage * Current_VE                                                                    # calculate own power (not read from BMS)
+                else:
+                    logging.error('%s: Victron current is None. Using BMS current and power instead.' % dt.now())   # the BMS values are not overwritten    
             
             except Exception:
                 logging.error('%s: Victron current read error. Using BMS current and power instead.' % dt.now())    # the BMS values are not overwritten       
@@ -467,13 +470,14 @@ class DbusAggBatService(object):
         if OWN_CHARGE_PARAMETERS:                                                           
             
             # manage charge voltage       
-            if (Voltage >= CHARGE_VOLTAGE * NrOfCellsPerBattery):
-                self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
+            ChargeVoltageBattery = CHARGE_VOLTAGE * NrOfCellsPerBattery
+            if (Voltage >= ChargeVoltageBattery):
+                self._ownCharge = InstalledCapacity                                                                     # reset Coulumb counter to 100%
             if MaxCellVoltage >= MAX_CELL_VOLTAGE:                         
-                MaxChargeVoltage = min(chargeVoltageReduced) - VOLTAGE_SET_PRECISION        # avoid exceeding MAX_CELL_VOLTAGE, take the charger innacuracy into account
-                self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
+                MaxChargeVoltage = min((min(chargeVoltageReduced)-VOLTAGE_SET_PRECISION), ChargeVoltageBattery)         # avoid exceeding MAX_CELL_VOLTAGE, take the charger innacuracy into account
+                self._ownCharge = InstalledCapacity                                                                     # reset Coulumb counter to 100%
             else:     
-                MaxChargeVoltage = CHARGE_VOLTAGE * NrOfCellsPerBattery
+                MaxChargeVoltage = ChargeVoltageBattery
                 
             if (Voltage <= DISCHARGE_VOLTAGE * NrOfCellsPerBattery) or (MinCellVoltage <= MIN_CELL_VOLTAGE):
                 self._ownCharge = 0                                                         # reset Coulumb counter to 0%     

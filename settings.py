@@ -1,4 +1,4 @@
-# Version 2.2
+# Version 2.3
 
 NR_OF_BATTERIES = 2                                     # Nr. of physical batteries to be aggregated
 NR_OF_MPPTS = 1                                         # Nr. of MPPTs
@@ -10,7 +10,8 @@ BATTERY_NAME_PATH = '/CustomName'                       # What defines the batte
 
 MULTI_KEY_WORD = 'com.victronenergy.vebus.tty'          # Key world to identify service of Multis/Quattros (or cluster of them)
 MPPT_KEY_WORD = 'com.victronenergy.solarcharger.tty'    # Key world to identify services of solar chargers (RS not tested, only SmartSolar)
-SMARTSHUNT_NAME_KEY_WORD = 'SmartShunt'                 # Key world to identify services of SmartShunt (not tested) 
+SMARTSHUNT_NAME_KEY_WORD = 'SmartShunt'                 # Key world to identify services of SmartShunt (not tested)
+                                                        # specify more precisely if more SmartShunts are in systems
 
 SEARCH_TRIALS = 10                                      # Trials to identify of all batteries before exit and restart
 READ_TRIALS = 10                                        # Trials to get consistent data of all batteries before exit and restart
@@ -27,7 +28,7 @@ CHARGE_VOLTAGE = 2.5                                    # Constant voltage charg
 MAX_CELL_VOLTAGE = 2.53                                 # If reached by 1-st cell, the charger voltage is clamped to the measured value
 DISCHARGE_VOLTAGE = 2.0                                 # If reached, discharge current set to zero
 MIN_CELL_VOLTAGE = 1.9                                  # If reached, discharge current set to zero
-VOLTAGE_SET_PRECISION = 0.04                            # To be subtracted from the calculated max. charge voltage if MAX_CELL_VOLTAGE is exceeded
+VOLTAGE_SET_PRECISION = 0.06                            # To be subtracted from the calculated max. charge voltage if MAX_CELL_VOLTAGE is exceeded
 
 MAX_CHARGE_CURRENT = 300                                # Max. charge current at normal conditions
 MAX_DISCHARGE_CURRENT = 200                             # Max. discharge current at normal conditions
