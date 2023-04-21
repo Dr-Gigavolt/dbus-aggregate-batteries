@@ -402,7 +402,7 @@ class DbusAggBatService(object):
         VoltagesSum = sum(VoltagesSum) / NR_OF_BATTERIES
         
         if not OWN_SOC:                                                             # only if needed
-            Soc = Soc / (NR_OF_BATTERIES * Capacity)
+            Soc = Soc / Capacity                                                    # weighted sum
         
         # find max and min cell temperature (have no ID)
         MaxCellTemp = self._fn._max(MaxCellTemperature)
