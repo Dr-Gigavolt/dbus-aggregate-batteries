@@ -116,6 +116,7 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Info/MaxChargeVoltage', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
         self._dbusservice.add_path('/Io/AllowToCharge', None, writeable=True)
         self._dbusservice.add_path('/Io/AllowToDischarge', None, writeable=True)
+        self._dbusservice.add_path('/Io/AllowToBalance', None, writeable=True)
 
         x = Thread(target = self._startMonitor)
         x.start()   
@@ -291,8 +292,9 @@ class DbusAggBatService(object):
         MaxChargeCurrent = []           # the minimum of MaxChargeCurrent * NR_OF_BATTERIES to be transmitted
         MaxDischargeCurrent = []        # the minimum of MaxDischargeCurrent * NR_OF_BATTERIES to be transmitted
         MaxChargeVoltage = []           # if some cells are above MAX_CELL_VOLTAGE, store here the sum of differences for each battery
-        AllowToCharge = []			    # minimum of all to be transmitted
-        AllowToDischarge = []		    # minimum of all to be transmitted
+        AllowToCharge = []              # minimum of all to be transmitted
+        AllowToDischarge = []           # minimum of all to be transmitted
+        AllowToBalance = []             # minimum of all to be transmitted
 
         ####################################################
         # Get DBus values from all SerialBattery instances #
@@ -371,8 +373,9 @@ class DbusAggBatService(object):
                     MaxDischargeCurrent.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxDischargeCurrent'))          # list of max. discharge currents  to find minimum
                     MaxChargeVoltage.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Info/MaxChargeVoltage'))                # list of max. charge voltages  to find minimum
                     
-                AllowToCharge.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Io/AllowToCharge'))					          # list of AllowToCharge to find minimum
-                AllowToDischarge.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Io/AllowToDischarge'))                      # list of AllowToDischarge to find minimum  
+                AllowToCharge.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Io/AllowToCharge'))                            # list of AllowToCharge to find minimum
+                AllowToDischarge.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Io/AllowToDischarge'))                      # list of AllowToDischarge to find minimum
+                AllowToBalance.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Io/AllowToBalance'))                          # list of AllowToBalance to find minimum  
         
             # find max and min cell voltage (have ID)
             # placed in try-except structure for the case if some values are of None. The _max() and _min() don't work with dictionaries
@@ -437,6 +440,7 @@ class DbusAggBatService(object):
         
         AllowToCharge = self._fn._min(AllowToCharge)
         AllowToDischarge = self._fn._min(AllowToDischarge)
+        AllowToBalance = self._fn._min(AllowToBalance)
         
         ####################################
         # Measure current by Victron stuff #
@@ -596,6 +600,7 @@ class DbusAggBatService(object):
             # this does not control the charger, is only displayed in GUI
             bus['/Io/AllowToCharge'] = AllowToCharge
             bus['/Io/AllowToDischarge'] = AllowToDischarge
+            bus['/Io/AllowToBalance'] = AllowToBalance
             
             
 

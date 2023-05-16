@@ -58,6 +58,7 @@ class DbusMon:
             
             '/Io/AllowToCharge': dummy,
             '/Io/AllowToDischarge': dummy,
+            '/Io/AllowToBalance': dummy,
             
             '/Voltages/Cell1': dummy,
             '/Voltages/Cell2': dummy,
