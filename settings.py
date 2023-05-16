@@ -1,4 +1,4 @@
-# Version 2.3
+# Version 2.4
 
 NR_OF_BATTERIES = 2                                     # Nr. of physical batteries to be aggregated
 NR_OF_MPPTS = 1                                         # Nr. of MPPTs

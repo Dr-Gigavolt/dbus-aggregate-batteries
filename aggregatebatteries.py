@@ -14,7 +14,7 @@ https://github.com/victronenergy/venus/wiki/dbus
 https://github.com/victronenergy/velib_python
 """
 
-VERSION = '2.3'
+VERSION = '2.4'
 
 from gi.repository import GLib
 import logging
