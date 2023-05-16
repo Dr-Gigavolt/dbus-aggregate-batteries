@@ -66,7 +66,7 @@ class DbusAggBatService(object):
 
         # Create DC paths        
         self._dbusservice.add_path('/Dc/0/Voltage', None, writeable=True, gettextcallback=lambda a, x: "{:.2f}V".format(x))
-        self._dbusservice.add_path('/Dc/0/Current', None, writeable=True, gettextcallback=lambda a, x: "{:.1f}A".format(x))
+        self._dbusservice.add_path('/Dc/0/Current', None, writeable=True, gettextcallback=lambda a, x: "{:.2f}A".format(x))
         self._dbusservice.add_path('/Dc/0/Power', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}W".format(x))
         
         # Create capacity paths
@@ -111,9 +111,9 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Alarms/LowTemperature', None, writeable=True)
         
         # Create control paths
-        self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
-        self._dbusservice.add_path('/Info/MaxDischargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.0f}A".format(x))
-        self._dbusservice.add_path('/Info/MaxChargeVoltage', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
+        self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.1f}A".format(x))
+        self._dbusservice.add_path('/Info/MaxDischargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.1f}A".format(x))
+        self._dbusservice.add_path('/Info/MaxChargeVoltage', None, writeable=True, gettextcallback=lambda a, x: "{:.2f}V".format(x))
         self._dbusservice.add_path('/Io/AllowToCharge', None, writeable=True)
         self._dbusservice.add_path('/Io/AllowToDischarge', None, writeable=True)
         self._dbusservice.add_path('/Io/AllowToBalance', None, writeable=True)
