@@ -148,10 +148,10 @@ class DbusAggBatService(object):
         try:                                                            # if Dbus monitor not running yet, new trial instead of exception
             for service in self._dbusConn.list_names():
                 if BATTERY_KEY_WORD in service:
-                    productName = self._dbusMon.dbusmon.get_value(service, '/ProductName')
+                    productName = self._dbusMon.dbusmon.get_value(service, BATTERY_NAME_PATH)
                     if BATTERY_NAME_KEY_WORD in productName:    
                         self._batteries.append(service)
-                        logging.info('%s: %s found.' % (dt.now(),(self._dbusMon.dbusmon.get_value(service, '/ProductName'))))
+                        logging.info('%s: %s found.' % (dt.now(),(self._dbusMon.dbusmon.get_value(service, BATTERY_NAME_PATH))))
                         batteriesCount += 1
                     elif SMARTSHUNT_NAME_KEY_WORD in productName:           # if SmartShunt found, can be used for DC load current
                         self._smartShunt = service
