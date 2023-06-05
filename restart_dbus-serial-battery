@@ -1,0 +1,5 @@
+#!/bin/bash
+#cp -f /data/etc/dbus-serialbattery/default_config.ini /opt/victronenergy/dbus-serialbattery &>/dev/null
+cp -f /data/etc/dbus-serialbattery/utils.py /opt/victronenergy/dbus-serialbattery &>/dev/null
+kill $(pgrep -f 'python /opt/victronenergy/dbus-serialbattery/dbus-serialbattery.py')
+

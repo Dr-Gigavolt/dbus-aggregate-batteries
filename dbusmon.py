@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Version 2.0
+# Version 2.4
 
 import sys
 sys.path.append('/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')
@@ -56,6 +56,45 @@ class DbusMon:
             '/Alarms/HighTemperature': dummy,
             '/Alarms/LowTemperature': dummy,
             
+            '/Io/AllowToCharge': dummy,
+            '/Io/AllowToDischarge': dummy,
+            '/Io/AllowToBalance': dummy,
+            
+            '/Voltages/Cell1': dummy,
+            '/Voltages/Cell2': dummy,
+            '/Voltages/Cell3': dummy,
+            '/Voltages/Cell4': dummy,
+            '/Voltages/Cell5': dummy,
+            '/Voltages/Cell6': dummy,
+            '/Voltages/Cell7': dummy,
+            '/Voltages/Cell8': dummy,
+            '/Voltages/Cell9': dummy,
+            '/Voltages/Cell10': dummy,
+            '/Voltages/Cell11': dummy,
+            '/Voltages/Cell12': dummy,
+            '/Voltages/Cell13': dummy,
+            '/Voltages/Cell14': dummy,
+            '/Voltages/Cell15': dummy,
+            '/Voltages/Cell16': dummy,
+            '/Voltages/Cell17': dummy,
+            '/Voltages/Cell18': dummy,
+            '/Voltages/Cell19': dummy,
+            '/Voltages/Cell20': dummy,
+            '/Voltages/Cell21': dummy,
+            '/Voltages/Cell22': dummy,
+            '/Voltages/Cell23': dummy,
+            '/Voltages/Cell24': dummy,
+            '/Voltages/Cell25': dummy,
+            '/Voltages/Cell26': dummy,
+            '/Voltages/Cell27': dummy,
+            '/Voltages/Cell28': dummy,
+            '/Voltages/Cell29': dummy,
+            '/Voltages/Cell30': dummy,
+            '/Voltages/Cell31': dummy,
+            '/Voltages/Cell32': dummy,
+            '/Voltages/Diff': dummy,
+            '/Voltages/Sum': dummy,
+            
 			'/Info/MaxChargeCurrent': dummy,
             '/Info/MaxDischargeCurrent': dummy,
 			'/Info/MaxChargeVoltage': dummy},
@@ -76,7 +115,7 @@ class DbusMon:
             logging.info('%s: %s' % (path, self.dbusmon.get_value(service, path)))
         logging.info('\n')
         return True
-        
+ 
 
 ################        
 # test program #
