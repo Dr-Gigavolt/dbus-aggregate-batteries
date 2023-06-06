@@ -609,8 +609,7 @@ class DbusAggBatService(object):
             # send voltages
             for cellId,currentCell in enumerate(cellVoltages):  
                 bus['/Voltages/Cell%d' % (cellId+1)] = cellVoltages[currentCell]
-                # to do: move the battery names detection outside of _update() function to execute only once
-                # and create paths dynamically: '/Voltages/%s_Cell%d' % (BatteryName, cellID)
+                # to do: create paths dynamically: '/Voltages/%s_Cell%d' % (BatteryName, cellID)
                 #    bus['/Voltages/%s' % currentCell] = cellVoltages[currentCell]
 
             # send battery state
