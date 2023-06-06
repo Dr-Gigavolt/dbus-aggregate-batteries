@@ -1,12 +1,3 @@
-Traceback (most recent call last):
-  File "./aggregatebatteries.py", line 523, in _update
-    MaxChargeCurrent = MAX_CHARGE_CURRENT * self._fn._interpolate(CELL_FULL_LIMITING_VOLTAGE, CELL_FULL_LIMITED_CURRENT, MaxCellVoltage)
-  File "/data/etc/dbus-aggregate-batteries/functions.py", line 35, in _interpolate
-    if x <= X[i+1]:
-TypeError: '<=' not supported between instances of 'float' and 'str'
-
-
-
 # Version 2.4
 
 NR_OF_BATTERIES = 2                                     # Nr. of physical batteries to be aggregated
