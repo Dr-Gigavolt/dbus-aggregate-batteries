@@ -29,7 +29,7 @@ from dbusmon import DbusMon
 from threading import Thread
 
 sys.path.append('/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')
-from vedbus import VeDbusService, VeDbusItemImport
+from vedbus import VeDbusService
 
 class DbusAggBatService(object):
     
@@ -41,6 +41,7 @@ class DbusAggBatService(object):
         self._smartShunt = None
         self._searchTrials = 0
         self._readTrials = 0
+        self._floatTimer = 0
         self._MaxChargeVoltage_old = 0
         self._MaxChargeCurrent_old = 0
         self._MaxDischargeCurrent_old = 0
@@ -111,7 +112,6 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Alarms/LowTemperature', None, writeable=True)
 
         # Create voltage paths
-        self._dbusservice.add_path('/Voltages/Diff', None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
         for cellId in range(1, (NR_OF_BATTERIES * NR_OF_CELLS_PER_BATTERIE) + 1):
             self._dbusservice.add_path('/Voltages/Cell%d' % cellId, None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
 
@@ -246,7 +246,7 @@ class DbusAggBatService(object):
     #### aggregate values of physical batteries, perform calculations, update Dbus ###
     ################################################################################## 
     ################################################################################## 
-    
+
     def _update(self):  
         
         # DC
@@ -314,6 +314,8 @@ class DbusAggBatService(object):
                 except Exception:
                     BatteryName = 'Battery%d' % (i + 1)    
                 
+                #TODO: Custom Names make problem if it is the same!
+
                 # DC                                               
                 Voltage += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Voltage')                                                      # sum for average voltage                                      
                 Current += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Current')                                                  # sum of currents                                              
@@ -407,9 +409,6 @@ class DbusAggBatService(object):
         Voltage = Voltage / NR_OF_BATTERIES
         Temperature = Temperature / NR_OF_BATTERIES
         VoltagesSum = sum(VoltagesSum) / NR_OF_BATTERIES
-
-        # calculate voltage diff
-        VoltagesDiff = round(MaxCellVoltage - MinCellVoltage, 3)
 
         if not OWN_SOC:                                                             # only if needed
             Soc = Soc / Capacity                                                    # weighted sum
@@ -559,6 +558,16 @@ class DbusAggBatService(object):
             Soc = ownSoc
             ConsumedAmphours = InstalledCapacity - self._ownCharge
         
+        # float mode
+        if FLOAT_MODE:
+            if Soc == 100:
+                if self._floatTimer < FLOAT_MODE * 60:
+                    self._floatTimer = self._floatTimer +1
+                else:
+                    MaxChargeVoltage = FLOAT_CELL_VOLTARE * NrOfCellsPerBattery
+            else:
+                self._floatTimer = 0
+
         #######################
         # Send values to DBus #
         #######################
@@ -587,22 +596,21 @@ class DbusAggBatService(object):
             bus['/System/MinCellVoltage'] = MinCellVoltage
             bus['/System/MinVoltageCellId'] = MinVoltageCellId
             bus['/Voltages/Sum']= VoltagesSum
-            bus['/Voltages/Diff']= MaxCellVoltage - MinCellVoltage
-        
+            bus['/Voltages/Diff']= round(MaxCellVoltage - MinCellVoltage, 3)
+
+            # send voltages
+            for cellId,currentCell in enumerate(cellVoltages):  
+                bus['/Voltages/Cell%d' % cellId+1] = cellVoltages[currentCell]
+                # to do: move the battery names detection outside of _update() function to execute only once
+                # and create paths dynamically: '/Voltages/%s_Cell%d' % (BatteryName, cellID)
+                #    bus['/Voltages/%s' % currentCell] = cellVoltages[currentCell]
+
             # send battery state
             bus['/System/NrOfCellsPerBattery'] = NrOfCellsPerBattery
             bus['/System/NrOfModulesOnline'] = NrOfModulesOnline
             bus['/System/NrOfModulesOffline'] = NrOfModulesOffline
             bus['/System/NrOfModulesBlockingCharge'] = NrOfModulesBlockingCharge
             bus['/System/NrOfModulesBlockingDischarge'] = NrOfModulesBlockingDischarge
-
-            # send voltages
-            bus['/Voltages/Diff'] = VoltagesDiff
-            for cellId,currentCell in enumerate(cellVoltages):  
-                bus['/Voltages/Cell%d' % cellId+1] = cellVoltages[currentCell]
-                # to do: move the battery names detection outside of _update() function to execute only once
-                # and create paths dynamically: '/Voltages/%s_Cell%d' % (BatteryName, cellID)
-                #    bus['/Voltages/%s' % currentCell] = cellVoltages[currentCell]
 
             # send alarms
             bus['/Alarms/LowVoltage'] = LowVoltage_alarm

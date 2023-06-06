@@ -32,6 +32,9 @@ DISCHARGE_VOLTAGE = 2.0                                 # If reached, discharge 
 MIN_CELL_VOLTAGE = 1.9                                  # If reached, discharge current set to zero
 VOLTAGE_SET_PRECISION = 0.06                            # To be subtracted from the calculated max. charge voltage if MAX_CELL_VOLTAGE is exceeded
 
+FLOAT_MODE = False                                      # False disables float mode, number in seconds will enable it after configured minutes by 100% soc
+FLOAT_CELL_VOLTARE = 3.375                              # Float voltage per cell
+
 MAX_CHARGE_CURRENT = 300                                # Max. charge current at normal conditions
 MAX_DISCHARGE_CURRENT = 200                             # Max. discharge current at normal conditions
 
