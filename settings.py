@@ -34,7 +34,7 @@ VOLTAGE_SET_PRECISION = 0.06                            # To be subtracted from 
 DYNAMIC_CVL_PRECISION = False                           # Enables dynamic reducing MaxChargeVoltage/CVL - False to disable this feature.
 #DYNAMIC_CVL_PRECISION = 0.01                           # Max precision for MPPTs are 10mV (0.01) - Charger will try to charge all cells to MAX_CELL_VOLTAGE without rising it on any cell
 FLOAT_MODE = False                                      # False disables float mode, number in seconds will enable it after configured minutes by 100% soc
-FLOAT_CELL_VOLTARE = 3.375                              # Float voltage per cell
+FLOAT_CELL_VOLTAGE = 3.375                              # Float voltage per cell
 
 MAX_CHARGE_CURRENT = 300                                # Max. charge current at normal conditions
 MAX_DISCHARGE_CURRENT = 200                             # Max. discharge current at normal conditions

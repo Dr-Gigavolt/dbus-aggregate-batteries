@@ -572,7 +572,7 @@ class DbusAggBatService(object):
                 if self._floatTimer < FLOAT_MODE * 60:
                     self._floatTimer = self._floatTimer +1
                 else:
-                    MaxChargeVoltage = FLOAT_CELL_VOLTARE * NrOfCellsPerBattery
+                    MaxChargeVoltage = FLOAT_CELL_VOLTAGE * NrOfCellsPerBattery
             else:
                 self._floatTimer = 0
 
