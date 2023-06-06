@@ -5,7 +5,7 @@ Service to aggregate multiple serial batteries https://github.com/Louisvdw/dbus-
 to one virtual battery.
 
 Python location on Venus:
-/usr/bin/python3.CHARGE_VOLTAGE * NrOfCellsPerBatteryCHARGE_VOLTAGE * NrOfCellsPerBattery
+/usr/bin/python3.8
 /usr/lib/python3.8/site-packages/
 
 References:
