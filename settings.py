@@ -1,3 +1,12 @@
+Traceback (most recent call last):
+  File "./aggregatebatteries.py", line 523, in _update
+    MaxChargeCurrent = MAX_CHARGE_CURRENT * self._fn._interpolate(CELL_FULL_LIMITING_VOLTAGE, CELL_FULL_LIMITED_CURRENT, MaxCellVoltage)
+  File "/data/etc/dbus-aggregate-batteries/functions.py", line 35, in _interpolate
+    if x <= X[i+1]:
+TypeError: '<=' not supported between instances of 'float' and 'str'
+
+
+
 # Version 2.4
 
 NR_OF_BATTERIES = 2                                     # Nr. of physical batteries to be aggregated
@@ -26,12 +35,13 @@ CHARGE_SAVE_PRECISION = 0.0025                          # Trade-off between save
 OWN_CHARGE_PARAMETERS = True                            # Calculate own charge/discharge control parameters (True) from following settings
                                                         # or use them from battery driver (False)
 CHARGE_VOLTAGE = 2.5                                    # Constant voltage charge = this value * nr. of cells
-MAX_VOLTAGE_DIFF = 0.01                                 # Max precision for MPPTs are 10mV (used for dynamic reducing MaxChargeVoltage) CHARGE_VOLTAGE must set to 'dynamic'
 MAX_CELL_VOLTAGE = 2.53                                 # If reached by 1-st cell, the charger voltage is clamped to the measured value
 DISCHARGE_VOLTAGE = 2.0                                 # If reached, discharge current set to zero
 MIN_CELL_VOLTAGE = 1.9                                  # If reached, discharge current set to zero
 VOLTAGE_SET_PRECISION = 0.06                            # To be subtracted from the calculated max. charge voltage if MAX_CELL_VOLTAGE is exceeded
 
+DYNAMIC_CVL_PRECISION = False                           # Enables dynamic reducing MaxChargeVoltage/CVL - False to disable this feature.
+#DYNAMIC_CVL_PRECISION = 0.01                           # Max precision for MPPTs are 10mV (0.01) - Charger will try to charge all cells to MAX_CELL_VOLTAGE without rising it on any cell
 FLOAT_MODE = False                                      # False disables float mode, number in seconds will enable it after configured minutes by 100% soc
 FLOAT_CELL_VOLTARE = 3.375                              # Float voltage per cell
 

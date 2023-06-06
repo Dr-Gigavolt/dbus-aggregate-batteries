@@ -35,13 +35,14 @@ class DbusAggBatService(object):
     
     def __init__(self, servicename='com.victronenergy.battery.aggregate'):
         self._fn = Functions()
-        self._batteries = []
+        self._batteries = {}
         self._multi = None
         self._mppts = []
         self._smartShunt = None
         self._searchTrials = 0
         self._readTrials = 0
         self._floatTimer = 0
+        self._nrOfCellsPerBattery = 0
         self._MaxChargeVoltage_old = 0
         self._MaxChargeCurrent_old = 0
         self._MaxDischargeCurrent_old = 0
@@ -145,7 +146,7 @@ class DbusAggBatService(object):
     #####################################################################
     
     def _find_batteries(self):
-        self._batteries = []
+        self._batteries = {}
         batteriesCount = 0
         productName = ''
         logging.info('%s: Searching batteries: Trial Nr. %d' % (dt.now(),(self._searchTrials + 1)))
@@ -155,9 +156,28 @@ class DbusAggBatService(object):
                 if BATTERY_KEY_WORD in service:
                     productName = self._dbusMon.dbusmon.get_value(service, '/ProductName')
                     if BATTERY_NAME_KEY_WORD in productName:    
-                        self._batteries.append(service)
-                        logging.info('%s: %s found.' % (dt.now(),(self._dbusMon.dbusmon.get_value(service, '/ProductName'))))
+                        # Custom name, if exists
+                        try:
+                            BatteryName = self._dbusMon.dbusmon.get_value(service, BATTERY_NAME_PATH)
+                        except Exception:
+                            BatteryName = 'Battery%d' % (batteriesCount + 1)     
+
+                        # Check if all batteries has a custom name 
+                        if BatteryName in self._batteries:
+                            BatteryName = '%s%d' %(BatteryName, batteriesCount + 1)
+                        
+                        self._batteries[BatteryName] = service
+                        logging.info('%s: %s found, named as: %s.' % (dt.now(),(self._dbusMon.dbusmon.get_value(service, '/ProductName')), BatteryName))
                         batteriesCount += 1
+
+                        # Check if Nr. of cells is equal
+                        if self._nrOfCellsPerBattery == 0:
+                            self._nrOfCellsPerBattery = self._dbusMon.dbusmon.get_value(service, '/System/NrOfCellsPerBattery')
+                        else:
+                            if self._nrOfCellsPerBattery != self._dbusMon.dbusmon.get_value(service, '/System/NrOfCellsPerBattery'):
+                                logging.error('%s: Number of cells of batteries is not equal. Exiting.'  % dt.now())
+                                sys.exit()
+
                     elif SMARTSHUNT_NAME_KEY_WORD in productName:           # if SmartShunt found, can be used for DC load current
                         self._smartShunt = service
                     
@@ -268,12 +288,12 @@ class DbusAggBatService(object):
         # Extras
         MaxCellVoltage = {}             # dictionary {'ID' : MaxCellVoltage, ... } for all physical batteries
         MinCellVoltage = {}             # dictionary {'ID' : MinCellVoltage, ... } for all physical batteries        
-        NrOfCellsPerBattery = []        # list, NRofCells of all physical batteries (shall be the same)
+        NrOfCellsPerBattery = self._nrOfCellsPerBattery        # list, NRofCells of all physical batteries (shall be the same)
         NrOfModulesOnline = 0
         NrOfModulesOffline = 0
         NrOfModulesBlockingCharge = 0
         NrOfModulesBlockingDischarge = 0
-        VoltagesSum = []                # battery voltages from sum of cells
+        VoltagesSum = {}                # battery voltages from sum of cells
         
         # Alarms
         LowVoltage_alarm = []           # lists to find maxima
@@ -307,15 +327,9 @@ class DbusAggBatService(object):
         
         #logging.info('%s: Starting read SerialBatteries' % dt.now())
         try:
-            for i in range(NR_OF_BATTERIES):
-                # Custom name, if exists
-                try:
-                    BatteryName = self._dbusMon.dbusmon.get_value(self._batteries[i], BATTERY_NAME_PATH)
-                except Exception:
-                    BatteryName = 'Battery%d' % (i + 1)    
+            for i in self._batteries:
+                BatteryName = i
                 
-                #TODO: Custom Names make problem if it is the same!
-
                 # DC                                               
                 Voltage += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Voltage')                                                      # sum for average voltage                                      
                 Current += self._dbusMon.dbusmon.get_value(self._batteries[i], '/Dc/0/Current')                                                  # sum of currents                                              
@@ -339,16 +353,15 @@ class DbusAggBatService(object):
                 MinCellVoltage['%s_%s' % (BatteryName, self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/MinVoltageCellId'))]\
                 = self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/MinCellVoltage')                                                      # append dictionary by the cell ID and its max. voltage
 
-                VoltagesSum.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/Voltages/Sum'))                                             
+                VoltagesSum[i] = self._dbusMon.dbusmon.get_value(self._batteries[i], '/Voltages/Sum')                                             
                 
                 # Battery state
-                NrOfCellsPerBattery.append(self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfCellsPerBattery'))                       # append list of nr. of cells, to do: put outside of _update()                 
                 NrOfModulesOnline += self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfModulesOnline')                                # sum of modules online
                 NrOfModulesOffline += self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfModulesOffline')                              # sum of modules offline
                 NrOfModulesBlockingCharge += self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfModulesBlockingCharge')                # sum of modules blocking charge
                 NrOfModulesBlockingDischarge += self._dbusMon.dbusmon.get_value(self._batteries[i], '/System/NrOfModulesBlockingDischarge')          # sum of modules blocking discharge
                 
-                for j in range (NrOfCellsPerBattery[i]):                                                                                             # make dictionary of all cell voltages        
+                for j in range (NrOfCellsPerBattery):                                                                                             # make dictionary of all cell voltages        
                     cellVoltages['%s_Cell%d' % (BatteryName, j+1)] = self._dbusMon.dbusmon.get_value(self._batteries[i], '/Voltages/Cell%d' % (j+1))                        
                 
                 # Alarms
@@ -368,7 +381,7 @@ class DbusAggBatService(object):
                 
                 if OWN_CHARGE_PARAMETERS:    # calculate reduction of charge voltage as sum of overvoltages of all cells
                     cellOvervoltage = 0
-                    for j in range (NrOfCellsPerBattery[i]):
+                    for j in range (NrOfCellsPerBattery):
                         cellVoltage = self._dbusMon.dbusmon.get_value(self._batteries[i], '/Voltages/Cell%d' % (j+1))
                         if (cellVoltage > MAX_CELL_VOLTAGE):
                             cellOvervoltage += (cellVoltage - MAX_CELL_VOLTAGE)   
@@ -408,7 +421,7 @@ class DbusAggBatService(object):
         # averaging
         Voltage = Voltage / NR_OF_BATTERIES
         Temperature = Temperature / NR_OF_BATTERIES
-        VoltagesSum = sum(VoltagesSum) / NR_OF_BATTERIES
+        VoltagesSum = sum(VoltagesSum.values()) / NR_OF_BATTERIES
 
         if not OWN_SOC:                                                             # only if needed
             Soc = Soc / Capacity                                                    # weighted sum
@@ -416,12 +429,6 @@ class DbusAggBatService(object):
         # find max and min cell temperature (have no ID)
         MaxCellTemp = self._fn._max(MaxCellTemperature)
         MinCellTemp = self._fn._min(MinCellTemperature)
-        
-        if self._fn._max(NrOfCellsPerBattery) == self._fn._min(NrOfCellsPerBattery):        # Nr. of cells must be equal; to do: put outside of _update()
-            NrOfCellsPerBattery = NrOfCellsPerBattery[0]
-        else:
-            logging.error('%s: Number of cells of batteries is not equal. Exiting.'  % dt.now())
-            sys.exit()
         
         # find max in alarms
         LowVoltage_alarm = self._fn._max(LowVoltage_alarm)
@@ -479,21 +486,21 @@ class DbusAggBatService(object):
         
         if OWN_CHARGE_PARAMETERS:                                                           
             
-            # manage charge voltage
-            if CHARGE_VOLTAGE == 'dynamic':
-                MAX_BATTERY_VOLAGE = MAX_CELL_VOLTAGE * NrOfCellsPerBattery
+            # manage charge voltage dynamic
+            if DYNAMIC_CVL_PRECISION:
+                MAX_BATTERY_VOLTAGE = MAX_CELL_VOLTAGE * NrOfCellsPerBattery
 
                 if MaxCellVoltage <= MAX_CELL_VOLTAGE:
-                    MaxChargeVoltage = MAX_BATTERY_VOLAGE + MAX_VOLTAGE_DIFF                    # not there yet, charge with slightly higher voltage to get that current flowing
+                    MaxChargeVoltage = MAX_BATTERY_VOLTAGE + DYNAMIC_CVL_PRECISION                    # not there yet, charge with slightly higher voltage to get that current flowing
 
                 if MaxCellVoltage > MAX_CELL_VOLTAGE:
                     if MinCellVoltage < MAX_CELL_VOLTAGE:
-                        MaxChargeVoltage = Voltage + MAX_VOLTAGE_DIFF                           # balancing, highest cell can't exceed mcv+x, lower cells can catch up
+                        MaxChargeVoltage = Voltage + DYNAMIC_CVL_PRECISION                           # balancing, highest cell can't exceed mcv+x, lower cells can catch up
                     else:
-                        MaxChargeVoltage = MAX_BATTERY_VOLAGE                                   # all cells at 100% SoC (for given maxcv), balancer has to bleed x from cells above maxcv
+                        MaxChargeVoltage = MAX_BATTERY_VOLTAGE                                   # all cells at 100% SoC (for given maxcv), balancer has to bleed x from cells above maxcv
                         self._ownCharge = InstalledCapacity
 
-                if MaxCellVoltage > MAX_CELL_VOLTAGE + MAX_VOLTAGE_DIFF:
+                if MaxCellVoltage > MAX_CELL_VOLTAGE + DYNAMIC_CVL_PRECISION:
                     MaxChargeVoltage = Voltage                                                  # just in case - balancer could not cope with current, pause charging
             else:
                 # manage charge voltage       
@@ -514,6 +521,7 @@ class DbusAggBatService(object):
                 MaxChargeCurrent = 0
             else:
                 MaxChargeCurrent = MAX_CHARGE_CURRENT * self._fn._interpolate(CELL_FULL_LIMITING_VOLTAGE, CELL_FULL_LIMITED_CURRENT, MaxCellVoltage)
+
 
             # manage discharge current
             if NrOfModulesBlockingDischarge > 0:
@@ -600,7 +608,7 @@ class DbusAggBatService(object):
 
             # send voltages
             for cellId,currentCell in enumerate(cellVoltages):  
-                bus['/Voltages/Cell%d' % cellId+1] = cellVoltages[currentCell]
+                bus['/Voltages/Cell%d' % (cellId+1)] = cellVoltages[currentCell]
                 # to do: move the battery names detection outside of _update() function to execute only once
                 # and create paths dynamically: '/Voltages/%s_Cell%d' % (BatteryName, cellID)
                 #    bus['/Voltages/%s' % currentCell] = cellVoltages[currentCell]
