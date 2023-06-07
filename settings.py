@@ -47,6 +47,12 @@ CELL_FULL_LIMITED_CURRENT =  [1, 0.05, 0]
 CELL_EMPTY_LIMITING_VOLTAGE = [DISCHARGE_VOLTAGE - 0.1, DISCHARGE_VOLTAGE, MIN_CELL_VOLTAGE]    # [min, .... ,max]
 CELL_EMPTY_LIMITED_CURRENT =  [0, 0.05, 1]
 
+# 0 Disable Cell Info in dbus
+# 1 Format: /Voltages/Cell<ID> (also available for display on Remote Console)
+# 2 Format: /Cell/BatteryName_Cell<ID>
+# 3 Both formats 1 and 2
+BATTERY_CELL_DATA_FORMAT = 0
+
 LOGGING = 2                                             # 0: no logging, 1: print to console, 2: print to file
 LOG_VOLTAGE_CHANGE = 0.1                                # change of max. charge voltage to be logged
 LOG_CURRENT_CHANGE = 5                                  # change of max. charge/discharge current to be logged

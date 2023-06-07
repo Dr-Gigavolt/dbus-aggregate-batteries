@@ -21,6 +21,7 @@ import logging
 import sys
 import os
 import dbus
+import re
 from settings import *
 from functions import *
 from datetime import datetime as dt         # for UTC time stamps for logging
@@ -113,8 +114,9 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Alarms/LowTemperature', None, writeable=True)
 
         # Create voltage paths
-        for cellId in range(1, (NR_OF_BATTERIES * NR_OF_CELLS_PER_BATTERIE) + 1):
-            self._dbusservice.add_path('/Voltages/Cell%d' % cellId, None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
+        if BATTERY_CELL_DATA_FORMAT == 1 or BATTERY_CELL_DATA_FORMAT == 3:
+            for cellId in range(1, (NR_OF_BATTERIES * NR_OF_CELLS_PER_BATTERIE) + 1):
+                self._dbusservice.add_path('/Voltages/Cell%d' % cellId, None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
 
         # Create control paths
         self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.1f}A".format(x))
@@ -169,6 +171,11 @@ class DbusAggBatService(object):
                         self._batteries[BatteryName] = service
                         logging.info('%s: %s found, named as: %s.' % (dt.now(),(self._dbusMon.dbusmon.get_value(service, '/ProductName')), BatteryName))
                         batteriesCount += 1
+
+                        # Create voltage paths with battery names
+                        if BATTERY_CELL_DATA_FORMAT == 2 or BATTERY_CELL_DATA_FORMAT == 3:
+                            for cellId in range(1, (NR_OF_CELLS_PER_BATTERIE) + 1):
+                                self._dbusservice.add_path('/Voltages/%s_Cell%d' % (re.sub('[^A-Za-z0-9_]+', '', BatteryName), cellId), None, writeable=True, gettextcallback=lambda a, x: "{:.3f}V".format(x))
 
                         # Check if Nr. of cells is equal
                         if self._nrOfCellsPerBattery == 0:
@@ -607,10 +614,13 @@ class DbusAggBatService(object):
             bus['/Voltages/Diff']= round(MaxCellVoltage - MinCellVoltage, 3)
 
             # send voltages
-            for cellId,currentCell in enumerate(cellVoltages):  
-                bus['/Voltages/Cell%d' % (cellId+1)] = cellVoltages[currentCell]
-                # to do: create paths dynamically: '/Voltages/%s_Cell%d' % (BatteryName, cellID)
-                #    bus['/Voltages/%s' % currentCell] = cellVoltages[currentCell]
+            if BATTERY_CELL_DATA_FORMAT == 1 or BATTERY_CELL_DATA_FORMAT == 3:
+                for cellId,currentCell in enumerate(cellVoltages):  
+                    bus['/Voltages/Cell%d' % (cellId+1)] = cellVoltages[currentCell]
+            
+            if BATTERY_CELL_DATA_FORMAT == 2 or BATTERY_CELL_DATA_FORMAT == 3:
+                for cellId,currentCell in enumerate(cellVoltages):  
+                    bus['/Voltages/%s' % (re.sub('[^A-Za-z0-9_]+', '', currentCell))] = cellVoltages[currentCell]
 
             # send battery state
             bus['/System/NrOfCellsPerBattery'] = NrOfCellsPerBattery
@@ -672,4 +682,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
