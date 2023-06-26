@@ -1,5 +1,5 @@
 #!/bin/bash
-#cp -f /data/etc/dbus-serialbattery/default_config.ini /opt/victronenergy/dbus-serialbattery &>/dev/null
-cp -f /data/etc/dbus-serialbattery/utils.py /opt/victronenergy/dbus-serialbattery &>/dev/null
+#cp -f /data/etc/dbus-serialbattery/default_config.ini /opt/victronenergy/dbus-serialbattery &>/dev/null	# SerialBattery configured by default_config.ini 
+cp -f /data/etc/dbus-serialbattery/utils.py /opt/victronenergy/dbus-serialbattery &>/dev/null				# Older versions of SerialBattery configured by utils.py
 kill $(pgrep -f 'python /opt/victronenergy/dbus-serialbattery/dbus-serialbattery.py')
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Version 2.4
+# Version 3.0
 
 import sys
 sys.path.append('/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')
@@ -105,13 +105,16 @@ class DbusMon:
             
             'com.victronenergy.solarcharger': {
             '/Dc/0/Current': dummy,
-            '/ProductName': dummy}
+            '/ProductName': dummy},
+            
+            'com.victronenergy.settings': {
+            '/Settings/CGwacs/OvervoltageFeedIn': dummy}
             }
         
         self.dbusmon = DbusMonitor(self.monitorlist)    
 
-    def print_values(self, service):
-        for path in self.monitorlist['com.victronenergy.battery']:
+    def print_values(self, service, mon_list):
+        for path in self.monitorlist[mon_list]:
             logging.info('%s: %s' % (path, self.dbusmon.get_value(service, path)))
         logging.info('\n')
         return True
@@ -124,16 +127,20 @@ class DbusMon:
 def main():
     logging.basicConfig(level=logging.INFO)
     DBusGMainLoop(set_as_default=True)
-    batterymonitor = BatteryMonitor()
+    dbusmon = DbusMon()
     
-    #GLib.timeout_add(1000, batterymonitor.print_values, 'com.victronenergy.battery.ttyUSB2')
-    batterymonitor.print_values('com.victronenergy.vebus.ttyUSB0')
-    batterymonitor.print_values('com.victronenergy.solarcharger.ttyUSB1')
     
-    # Start and run the mainloop
-    logging.info("Battery monitor: Starting mainloop.\n")
-    mainloop = GLib.MainLoop()
-    mainloop.run()
+    #dbusmon.print_values('com.victronenergy.battery.ttyUSB2', 'com.victronenergy.battery')
+    #dbusmon.print_values('com.victronenergy.vebus.ttyUSB0', 'com.victronenergy.vebus')
+    #dbusmon.print_values('com.victronenergy.solarcharger.ttyUSB1', 'com.victronenergy.solarcharger')
+    dbusmon.print_values('com.victronenergy.settings', 'com.victronenergy.settings')   
+    dbusmon.dbusmon.set_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn', 0)
+    
+    #GLib.timeout_add(1000, dbusmon.print_values, 'com.victronenergy.battery.ttyUSB2')
+    #Start and run the mainloop
+    #logging.info("Battery monitor: Starting mainloop.\n")
+    #mainloop = GLib.MainLoop()
+    #mainloop.run()
 
 if __name__ == "__main__":
 	main()
