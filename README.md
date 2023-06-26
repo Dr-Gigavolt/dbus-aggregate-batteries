@@ -1,16 +1,4 @@
-<<<<<<< Updated upstream
-Version 3.0 is being tested and will be published soon. The following features will be added:
-
-- reduced CVL (to extend the battery life time) with full charge once per given period of time (to balance and reset SoC counter) ... an alternative instead of doing it every day by bulk-absorption-float
-- automatic deactivation of DC-coupled feed in (to enable CCL) in case of dynamic SoC reduction due to voltage peaking of one ore multiple cells
-- automatic deactivation of DC-coupled feed in case of blocking charge or discharge by BMS
-- sending of cell voltages to Dbus (made by Marvo2011)
-
-
-Version 2.4
-=======
 Version 3.0
->>>>>>> Stashed changes
 
 This is a service for Victron Venus OS to collect the data from multiple parallel-connected batteries using https://github.com/Louisvdw/dbus-serialbattery driver, merge them and publish as a single virtual battery to Dbus. 
 It could serve at least as a temporary solution for https://github.com/Louisvdw/dbus-serialbattery/issues/8
