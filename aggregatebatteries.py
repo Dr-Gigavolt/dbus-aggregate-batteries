@@ -124,6 +124,7 @@ class DbusAggBatService(object):
         self._dbusservice.add_path('/Alarms/LowChargeTemperature', None, writeable=True)
         self._dbusservice.add_path('/Alarms/HighTemperature', None, writeable=True)
         self._dbusservice.add_path('/Alarms/LowTemperature', None, writeable=True)
+        self._dbusservice.add_path('/Alarms/BmsCable', None, writeable=True)
         
         # Create control paths
         self._dbusservice.add_path('/Info/MaxChargeCurrent', None, writeable=True, gettextcallback=lambda a, x: "{:.1f}A".format(x))
@@ -353,6 +354,7 @@ class DbusAggBatService(object):
         LowChargeTemperature_alarm_list = []
         HighTemperature_alarm_list = []
         LowTemperature_alarm_list = []
+        BmsCable_alarm_list = []
         
         # Charge/discharge parameters
         MaxChargeCurrent_list = []           # the minimum of MaxChargeCurrent * NR_OF_BATTERIES to be transmitted
@@ -429,6 +431,7 @@ class DbusAggBatService(object):
                 LowChargeTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], '/Alarms/LowChargeTemperature'))
                 HighTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], '/Alarms/HighTemperature'))
                 LowTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], '/Alarms/LowTemperature'))
+                BmsCable_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], '/Alarms/BmsCable'))
                 
                 if OWN_CHARGE_PARAMETERS:    # calculate reduction of charge voltage as sum of overvoltages of all cells
                     step = 'Calculate CVL reduction'
@@ -462,7 +465,7 @@ class DbusAggBatService(object):
             self._readTrials += 1
             logging.error('%s: Error: %s.' % ((dt.now()).strftime('%c'), err))
             logging.error('Occured during step %s, Battery %s.' % (step, i))
-            logging.error('Read trial nr. %d' & self._readTrials)
+            logging.error('Read trial nr. %d' % self._readTrials)
             if (self._readTrials > READ_TRIALS):
                 logging.error('%s: DBus read failed. Exiting.'  % (dt.now()).strftime('%c'))
                 sys.exit()
@@ -497,6 +500,7 @@ class DbusAggBatService(object):
         LowChargeTemperature_alarm = self._fn._max(LowChargeTemperature_alarm_list)
         HighTemperature_alarm = self._fn._max(HighTemperature_alarm_list)
         LowTemperature_alarm = self._fn._max(LowTemperature_alarm_list)
+        BmsCable_alarm = self._fn._max(BmsCable_alarm_list)
         
         # find max. charge voltage (if needed)
         if not OWN_CHARGE_PARAMETERS:
@@ -715,11 +719,26 @@ class DbusAggBatService(object):
             bus['/Alarms/LowChargeTemperature'] = LowChargeTemperature_alarm
             bus['/Alarms/HighTemperature'] = HighTemperature_alarm
             bus['/Alarms/LowTemperature'] = LowTemperature_alarm
+            bus['/Alarms/BmsCable'] = BmsCable_alarm
         
             # send charge/discharge control
+            
             bus['/Info/MaxChargeCurrent'] = MaxChargeCurrent
             bus['/Info/MaxDischargeCurrent'] = MaxDischargeCurrent
             bus['/Info/MaxChargeVoltage'] = MaxChargeVoltage
+            
+            '''
+            # Not working, Serial Battery disapears regardles BLOCK_ON_DISCONNECT is True or False
+            if BmsCable_alarm == 0: 
+                bus['/Info/MaxChargeCurrent'] = MaxChargeCurrent
+                bus['/Info/MaxDischargeCurrent'] = MaxDischargeCurrent
+                bus['/Info/MaxChargeVoltage'] = MaxChargeVoltage
+            else:                                                       # if BMS connection lost
+                bus['/Info/MaxChargeCurrent'] = 0
+                bus['/Info/MaxDischargeCurrent'] = 0
+                bus['/Info/MaxChargeVoltage'] = NR_OF_CELLS_PER_BATTERY * min(CHARGE_VOLTAGE_LIST)
+                logging.error('%s: BMS connection lost.' % (dt.now()).strftime('%c'))
+            '''    
             
             # this does not control the charger, is only displayed in GUI
             bus['/Io/AllowToCharge'] = AllowToCharge

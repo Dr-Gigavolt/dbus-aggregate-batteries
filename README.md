@@ -22,9 +22,10 @@ Installation:
 The service starts automatically after start/restart of the Venus OS. After modifying of files restart it by executing:
 
 sh restart - it kills the service which starts automatically again
-sh restart_dbus-serial-battery - the same for all instances of the battery driver
-sh restart_all - the same for both, battery driver and AggregateBatteries
-(please adapt the last two according your version of SerialBattery)
+sh restart_dbus-serial-battery - kills all instances of Serial Battery, reninstalls files and starts again
+If you restart the Serial Battery, wait until all instances are visible, assign CustomNames and restart the Aggregate Batteries 
+
+
 
 For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: python3 aggregatebatteries.py
 

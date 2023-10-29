@@ -56,6 +56,7 @@ class DbusMon:
             '/Alarms/LowChargeTemperature': dummy,
             '/Alarms/HighTemperature': dummy,
             '/Alarms/LowTemperature': dummy,
+            '/Alarms/BmsCable': dummy,
             
             '/Io/AllowToCharge': dummy,
             '/Io/AllowToDischarge': dummy,
