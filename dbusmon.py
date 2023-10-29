@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Version 3.0
+# Version 3.1
 
 import sys
 sys.path.append('/opt/victronenergy/dbus-systemcalc-py/ext/velib_python')
@@ -41,6 +41,7 @@ class DbusMon:
             '/System/NrOfModulesOffline': dummy,
             '/System/NrOfModulesBlockingCharge': dummy,
             '/System/NrOfModulesBlockingDischarge': dummy,
+            '/TimeToGo': dummy,
             
             '/Alarms/LowVoltage': dummy,
             '/Alarms/HighVoltage': dummy,
@@ -97,7 +98,8 @@ class DbusMon:
             
 			'/Info/MaxChargeCurrent': dummy,
             '/Info/MaxDischargeCurrent': dummy,
-			'/Info/MaxChargeVoltage': dummy},
+			'/Info/MaxChargeVoltage': dummy,
+            '/Info/ChargeMode': dummy},
             
             'com.victronenergy.vebus': {
             '/Dc/0/Current': dummy,
@@ -108,7 +110,12 @@ class DbusMon:
             '/ProductName': dummy},
             
             'com.victronenergy.settings': {
-            '/Settings/CGwacs/OvervoltageFeedIn': dummy}
+            '/Settings/CGwacs/OvervoltageFeedIn': dummy},
+            
+            'com.victronenergy.system': {
+            '/SystemState/LowSoc': dummy,
+            '/SystemState/BatteryLife': dummy},
+            
             }
         
         self.dbusmon = DbusMonitor(self.monitorlist)    
