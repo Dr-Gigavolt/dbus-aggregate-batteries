@@ -71,6 +71,7 @@ class DbusAggBatService(object):
                 self._lastBalancing = int(self._lastBalancing_file.readline().strip())
                 self._lastBalancing_file.close()
                 logging.info('%s: Last balancing done at the %d. day of the year' % ((dt.now()).strftime('%c'), self._lastBalancing))
+                logging.info('Batteries balanced %d days ago.' % (int((dt.now()).strftime('%j')) - self._lastBalancing))
             except Exception:
                 logging.error('%s: Last balancing file read error. Exiting.' % (dt.now()).strftime('%c'))
                 sys.exit()         
@@ -543,7 +544,9 @@ class DbusAggBatService(object):
         
         if OWN_CHARGE_PARAMETERS:                                                           
             CVL_NORMAL = NR_OF_CELLS_PER_BATTERY * CHARGE_VOLTAGE_LIST[int((dt.now()).strftime('%m')) - 1]
-            CVL_BALANCING = NR_OF_CELLS_PER_BATTERY * BALANCING_VOLTAGE            
+            CVL_BALANCING = NR_OF_CELLS_PER_BATTERY * BALANCING_VOLTAGE
+            ChargeVoltageBattery = CVL_NORMAL
+            
             time_unbalanced = int((dt.now()).strftime('%j')) - self._lastBalancing              # in days
             
             if (CVL_BALANCING > CVL_NORMAL):
