@@ -618,6 +618,9 @@ class DbusAggBatService(object):
                 MaxChargeCurrent = MAX_CHARGE_CURRENT * self._fn._interpolate(CELL_FULL_LIMITING_VOLTAGE, CELL_FULL_LIMITED_CURRENT, MaxCellVoltage)
 
             # manage discharge current
+            if MinCellVoltage <= MIN_CELL_VOLTAGE:
+                self._fullyDischarged = True
+            
             if (NrOfModulesBlockingDischarge > 0) or (self._fullyDischarged):
                 MaxDischargeCurrent = 0
             else:
