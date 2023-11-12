@@ -619,14 +619,14 @@ class DbusAggBatService(object):
 
             # manage discharge current
             if MinCellVoltage <= MIN_CELL_VOLTAGE:
-                self._fullyDischarged = True
+                self._fullyDischarged = True           
+            elif MinCellVoltage > MIN_CELL_VOLTAGE + MIN_CELL_HYSTERESIS:
+                self._fullyDischarged = False       
             
             if (NrOfModulesBlockingDischarge > 0) or (self._fullyDischarged):
                 MaxDischargeCurrent = 0
             else:
                 MaxDischargeCurrent = MAX_DISCHARGE_CURRENT * self._fn._interpolate(CELL_EMPTY_LIMITING_VOLTAGE, CELL_EMPTY_LIMITED_CURRENT, MinCellVoltage)
-                if MinCellVoltage > MIN_CELL_VOLTAGE + MIN_CELL_HYSTERESIS:
-                        self._fullyDischarged = False
         
         ###########################################################
         ################# Periodic logging ########################
