@@ -51,6 +51,7 @@ CHARGE_VOLTAGE_LIST = [2.45, 2.45, 2.42, 2.40, 2.40, 2.35, 2.35, 2.35, 2.40, 2.4
 
 MAX_CELL_VOLTAGE = 2.5                                  # If reached by 1-st cell, the CVL is dynamically limited. DC-coupled PV feed-in will be disabled to enable the CCL. 
 MIN_CELL_VOLTAGE = 1.9                                  # If reached, discharge current set to zero
+MIN_CELL_HYSTERESIS = 0.1                               # Allow discharge above MIN_CELL_VOLTAGE + MIN_CELL_HYSTERESIS
 CELL_DIFF_MAX = 0.025                                   # If lower: re-enable DC-coupled PV feed in (if was enabled before); go back from BALANCING_VOLTAGE to CHARGE_VOLTAGE
 
 MAX_CHARGE_CURRENT = 300                                # Max. charge current at normal conditions

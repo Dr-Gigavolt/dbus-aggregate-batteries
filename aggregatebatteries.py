@@ -45,6 +45,7 @@ class DbusAggBatService(object):
         self._MaxChargeVoltage_old = 0
         self._MaxChargeCurrent_old = 0
         self._MaxDischargeCurrent_old = 0
+        self._fullyDischarged = False           # implementing hysteresis for allowing discharge
         self._dbusservice = VeDbusService(servicename)
         self._dbusConn = dbus.SessionBus()  if 'DBUS_SESSION_BUS_ADDRESS' in os.environ else dbus.SystemBus()
         self._timeOld = tt.time()
@@ -617,10 +618,12 @@ class DbusAggBatService(object):
                 MaxChargeCurrent = MAX_CHARGE_CURRENT * self._fn._interpolate(CELL_FULL_LIMITING_VOLTAGE, CELL_FULL_LIMITED_CURRENT, MaxCellVoltage)
 
             # manage discharge current
-            if NrOfModulesBlockingDischarge > 0:
+            if (NrOfModulesBlockingDischarge > 0) or (self._fullyDischarged):
                 MaxDischargeCurrent = 0
             else:
                 MaxDischargeCurrent = MAX_DISCHARGE_CURRENT * self._fn._interpolate(CELL_EMPTY_LIMITING_VOLTAGE, CELL_EMPTY_LIMITED_CURRENT, MinCellVoltage)
+                if MinCellVoltage > MIN_CELL_VOLTAGE + MIN_CELL_HYSTERESIS:
+                        self._fullyDischarged = False
         
         ###########################################################
         ################# Periodic logging ########################
