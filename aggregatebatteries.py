@@ -548,9 +548,9 @@ class DbusAggBatService(object):
             CVL_BALANCING = NR_OF_CELLS_PER_BATTERY * BALANCING_VOLTAGE
             ChargeVoltageBattery = CVL_NORMAL
             
-            time_unbalanced = int((dt.now()).strftime('%j')) - self._lastBalancing              # in days
+            time_unbalanced = int((dt.now()).strftime('%j')) - self._lastBalancing                  # in days
             
-            if (CVL_BALANCING > CVL_NORMAL):
+            if (CVL_BALANCING > CVL_NORMAL):                                                        # if the normal charging voltage is lower then 100% SoC
                 # manage balancing voltage    
                 if time_unbalanced < 0:
                     time_unbalanced += 365                                                          # year change 
@@ -561,14 +561,14 @@ class DbusAggBatService(object):
                 if self._balancing == 1:
                     ChargeVoltageBattery = CVL_BALANCING
                     if (Voltage >= 0.99 * CVL_BALANCING):
-                        self._ownCharge = InstalledCapacity         # reset Coulumb counter to 100%
+                        self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
                         if ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):
                             self._balancing = 2;
                             logging.info('%s: Balancing goal reached.'  % (dt.now()).strftime('%c'))    
             
                 if self._balancing >= 2:
-                    ChargeVoltageBattery = CVL_BALANCING
-                    if Voltage <= CVL_NORMAL:                       # additional charge consumed
+                    ChargeVoltageBattery = CVL_BALANCING                                            # keep balancing voltage at balancing day until decrease of solar powers and   
+                    if Voltage <= CVL_NORMAL:                                                       # the charge above "normal" is consumed
                         self._balancing = 0;
                         self._lastBalancing = int((dt.now()).strftime('%j'))
                         self._lastBalancing_file = open('/data/dbus-aggregate-batteries/last_balancing', 'w')
@@ -579,8 +579,8 @@ class DbusAggBatService(object):
                 if self._balancing == 0:
                     ChargeVoltageBattery = CVL_NORMAL
                     
-            elif time_unbalanced > 0:
-                logging.info('%s: Full charging set as normal. Updating last_balancing file.'  % (dt.now()).strftime('%c'))
+            elif (time_unbalanced > 0) and (Voltage >= 0.99 * CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):   # if normal charging voltage is 100% SoC and balancing is finished
+                logging.info('%s: Balancing goal reached with full charging set as normal. Updating last_balancing file.'  % (dt.now()).strftime('%c'))
                 self._lastBalancing = int((dt.now()).strftime('%j'))
                 self._lastBalancing_file = open('/data/dbus-aggregate-batteries/last_balancing', 'w')
                 self._lastBalancing_file.write('%s' % self._lastBalancing)
@@ -615,7 +615,7 @@ class DbusAggBatService(object):
             if NrOfModulesBlockingCharge > 0:
                 MaxChargeCurrent = 0
             else:
-                MaxChargeCurrent = MAX_CHARGE_CURRENT * self._fn._interpolate(CELL_FULL_LIMITING_VOLTAGE, CELL_FULL_LIMITED_CURRENT, MaxCellVoltage)
+                MaxChargeCurrent = MAX_CHARGE_CURRENT * self._fn._interpolate(CELL_CHARGE_LIMITING_VOLTAGE, CELL_CHARGE_LIMITED_CURRENT, MaxCellVoltage)
 
             # manage discharge current
             if MinCellVoltage <= MIN_CELL_VOLTAGE:
@@ -626,28 +626,18 @@ class DbusAggBatService(object):
             if (NrOfModulesBlockingDischarge > 0) or (self._fullyDischarged):
                 MaxDischargeCurrent = 0
             else:
-                MaxDischargeCurrent = MAX_DISCHARGE_CURRENT * self._fn._interpolate(CELL_EMPTY_LIMITING_VOLTAGE, CELL_EMPTY_LIMITED_CURRENT, MinCellVoltage)
-        
-        ###########################################################
-        ################# Periodic logging ########################
-        ###########################################################
-        
-        if LOG_PERIOD > 0:
-            if self._logTimer < LOG_PERIOD:
-                self._logTimer += 1
-            else:
-                self._logTimer = 0
-                logging.info('%s: CVL: %.1fV, CCL: %.0fA, DCL: %.0fA'  % ((dt.now()).strftime('%c'), MaxChargeVoltage, MaxChargeCurrent, MaxDischargeCurrent))
-                logging.info('%s: Bat. voltage: %.1fV, Bat. current: %.0fA, Balancing state: %d'  % ((dt.now()).strftime('%c'), Voltage, Current, self._balancing))
-                logging.info('%s: Min. cell voltage: %.3fV, Max. cell voltage: %.3fV, difference: %.3fV'  % ((dt.now()).strftime('%c'), MinCellVoltage, MaxCellVoltage, MaxCellVoltage - MinCellVoltage))       
-        
+                MaxDischargeCurrent = MAX_DISCHARGE_CURRENT * self._fn._interpolate(CELL_DISCHARGE_LIMITING_VOLTAGE, CELL_DISCHARGE_LIMITED_CURRENT, MinCellVoltage)      
+                
         ###########################################################
         # own Coulomb counter (runs even the BMS values are used) #
         ###########################################################
         
         deltaTime = tt.time() - self._timeOld         
         self._timeOld = tt.time()
-        self._ownCharge += Current * deltaTime / 3600
+        if Current > 0:
+            self._ownCharge += Current * (deltaTime / 3600) * BATTERY_EFFICIENCY                # charging (with efficiency)
+        else:    
+            self._ownCharge += Current * (deltaTime / 3600)                                     # discharging
         self._ownCharge = max(self._ownCharge, 0) 
         self._ownCharge = min(self._ownCharge, InstalledCapacity)
         
@@ -753,6 +743,20 @@ class DbusAggBatService(object):
             bus['/Io/AllowToCharge'] = AllowToCharge
             bus['/Io/AllowToDischarge'] = AllowToDischarge
             bus['/Io/AllowToBalance'] = AllowToBalance
+
+        ###########################################################
+        ################# Periodic logging ########################
+        ###########################################################
+        
+        if LOG_PERIOD > 0:
+            if self._logTimer < LOG_PERIOD:
+                self._logTimer += 1
+            else:
+                self._logTimer = 0
+                logging.info('%s: Repetitive logging:' % dt.now().strftime('%c'))
+                logging.info('  CVL: %.1fV, CCL: %.0fA, DCL: %.0fA'  % (MaxChargeVoltage, MaxChargeCurrent, MaxDischargeCurrent))
+                logging.info('  Bat. voltage: %.1fV, Bat. current: %.0fA, SoC: %.1f%%, Balancing state: %d'  % (Voltage, Current, Soc, self._balancing))
+                logging.info('  Min. cell voltage: %s: %.3fV, Max. cell voltage: %s: %.3fV, difference: %.3fV'  % (MinVoltageCellId, MinCellVoltage, MaxVoltageCellId, MaxCellVoltage, MaxCellVoltage - MinCellVoltage)) 
 
         return True
             

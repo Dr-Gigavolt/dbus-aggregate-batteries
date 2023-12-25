@@ -26,7 +26,7 @@ SEARCH_TRIALS = 10                                      # Trials to identify of 
 READ_TRIALS = 10                                        # Trials to get consistent data of all batteries before exit and restart
 
 #######################################
-############ DBus settings ############
+############## Options ################
 #######################################
 
 CURRENT_FROM_VICTRON = True                             # If True, the current measurement by Multis/Quattros and MPPTs is taken instead of BMS.
@@ -53,6 +53,7 @@ MAX_CELL_VOLTAGE = 2.5                                  # If reached by 1-st cel
 MIN_CELL_VOLTAGE = 1.9                                  # If reached, discharge current set to zero
 MIN_CELL_HYSTERESIS = 0.1                               # Allow discharge above MIN_CELL_VOLTAGE + MIN_CELL_HYSTERESIS
 CELL_DIFF_MAX = 0.025                                   # If lower: re-enable DC-coupled PV feed in (if was enabled before); go back from BALANCING_VOLTAGE to CHARGE_VOLTAGE
+BATTERY_EFFICIENCY = 0.98                               # Ah fed into batteries are multiplied by efficiency 
 
 MAX_CHARGE_CURRENT = 300                                # Max. charge current at normal conditions
 MAX_DISCHARGE_CURRENT = 200                             # Max. discharge current at normal conditions
@@ -61,10 +62,10 @@ MAX_DISCHARGE_CURRENT = 200                             # Max. discharge current
 # the lists may have any length, but the same length for voltage and current
 # linear interpolation is used for values between
 
-CELL_FULL_LIMITING_VOLTAGE = [BALANCING_VOLTAGE - 0.1, BALANCING_VOLTAGE, MAX_CELL_VOLTAGE]           # [min, .... ,max]
-CELL_FULL_LIMITED_CURRENT =  [1, 0.05, 0]
-CELL_EMPTY_LIMITING_VOLTAGE = [MIN_CELL_VOLTAGE, MIN_CELL_VOLTAGE + 0.1, MIN_CELL_VOLTAGE + 0.2]    # [min, .... ,max]
-CELL_EMPTY_LIMITED_CURRENT =  [0, 0.05, 1]
+CELL_CHARGE_LIMITING_VOLTAGE = [MIN_CELL_VOLTAGE, MIN_CELL_VOLTAGE + 0.05, BALANCING_VOLTAGE - 0.1, BALANCING_VOLTAGE, MAX_CELL_VOLTAGE] # [min, ... ,max]; low voltage: limiting current from grid
+CELL_CHARGE_LIMITED_CURRENT =  [0.2, 1, 1, 0.05, 0]
+CELL_DISCHARGE_LIMITING_VOLTAGE = [MIN_CELL_VOLTAGE, MIN_CELL_VOLTAGE + 0.1, MIN_CELL_VOLTAGE + 0.2]    # [min, ... ,max]
+CELL_DISCHARGE_LIMITED_CURRENT =  [0, 0.05, 1]
 
 ########################################
 ### if OWN_CHARGE_PARAMETERS = False ###

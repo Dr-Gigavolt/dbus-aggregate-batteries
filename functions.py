@@ -46,8 +46,8 @@ class Functions:
 def main(): 
     import settings as s
     fn = Functions()
-    x = 2.51
-    print(s.MAX_CHARGE_CURRENT*fn._interpolate(s.CELL_FULL_LIMITING_VOLTAGE, s.CELL_FULL_LIMITED_CURRENT, x))
+    for x in range(0, 251):
+        print("%.2f %.0f" % (x/100.0, s.MAX_CHARGE_CURRENT*fn._interpolate(s.CELL_CHARGE_LIMITING_VOLTAGE, s.CELL_CHARGE_LIMITED_CURRENT, x/100.0)))
 
 if __name__ == "__main__":
 	main()
