@@ -1,4 +1,5 @@
-Version 3.1
+Version 3.1 (still under test and review)
+
 
 Attention: This is my first experience with the Victron system. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in settings.py. None of them is universal, you have to adapt everything to your system. 
 
@@ -54,6 +55,7 @@ If the target charge voltage is set below the BALANCING_VOLTAGE (regular chargin
 Changes in V3.1:
 - parameter BATTERY_EFFICIENCY, it is multiplied by charge fed into battery in order to minimize accumulation of SoC error if the batteries are not fully charged for longer period of time.  
 - CHARGE_VOLTAGE_LIST containing a target cell voltage for each month.
+- KEEP_MAX_CVL parameter added, see explanation in settings.py
 
 For better understanding whether the discharge to "Float" it useful or not please find and share some papers about LFP aging under constant voltage. Up to now I found such a document for LTO only (https://www.global.toshiba/content/dam/toshiba/ww/products-solutions/battery/scib/pdf/ToshibaRechargeableBattery-en.pdf or http://futuregrqd.cluster027.hosting.ovh.net/Download/Datasheet/Toshiba_LTO_2.4V_20Ah.pdf), see "Float characteristic".    
 
