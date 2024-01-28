@@ -71,8 +71,11 @@ class DbusAggBatService(object):
                 self._lastBalancing_file = open('/data/dbus-aggregate-batteries/last_balancing', 'r')      # read
                 self._lastBalancing = int(self._lastBalancing_file.readline().strip())
                 self._lastBalancing_file.close()
+                time_unbalanced = int((dt.now()).strftime('%j')) - self._lastBalancing                  # in days
+                if time_unbalanced < 0:
+                    time_unbalanced += 365                                                              # year change
                 logging.info('%s: Last balancing done at the %d. day of the year' % ((dt.now()).strftime('%c'), self._lastBalancing))
-                logging.info('Batteries balanced %d days ago.' % (int((dt.now()).strftime('%j')) - self._lastBalancing))
+                logging.info('Batteries balanced %d days ago.' % time_unbalanced)
             except Exception:
                 logging.error('%s: Last balancing file read error. Exiting.' % (dt.now()).strftime('%c'))
                 sys.exit()         
@@ -549,11 +552,11 @@ class DbusAggBatService(object):
             ChargeVoltageBattery = CVL_NORMAL
             
             time_unbalanced = int((dt.now()).strftime('%j')) - self._lastBalancing                  # in days
+            if time_unbalanced < 0:
+                time_unbalanced += 365                                                              # year change
             
             if (CVL_BALANCING > CVL_NORMAL):                                                        # if the normal charging voltage is lower then 100% SoC
                 # manage balancing voltage    
-                if time_unbalanced < 0:
-                    time_unbalanced += 365                                                          # year change 
                 if (self._balancing == 0) and (time_unbalanced >= BALANCING_REPETITION):
                     self._balancing = 1                                                             # activate increased CVL for balancing
                     logging.info('%s: CVL increase for balancing activated.'  % (dt.now()).strftime('%c'))
@@ -580,6 +583,7 @@ class DbusAggBatService(object):
                     ChargeVoltageBattery = CVL_NORMAL
                     
             elif (time_unbalanced > 0) and (Voltage >= 0.99 * CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):   # if normal charging voltage is 100% SoC and balancing is finished
+                self._ownCharge = InstalledCapacity                                                 # reset Coulumb counter to 100%
                 logging.info('%s: Balancing goal reached with full charging set as normal. Updating last_balancing file.'  % (dt.now()).strftime('%c'))
                 self._lastBalancing = int((dt.now()).strftime('%j'))
                 self._lastBalancing_file = open('/data/dbus-aggregate-batteries/last_balancing', 'w')
