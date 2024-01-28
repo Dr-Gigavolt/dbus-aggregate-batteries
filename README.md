@@ -1,5 +1,4 @@
-Version 3.1 (still under test and review)
-
+Version 3.1 (beta)
 
 Attention: This is my first experience with the Victron system. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in settings.py. None of them is universal, you have to adapt everything to your system. 
 
@@ -24,8 +23,6 @@ The service starts automatically after start/restart of the Venus OS. After modi
 sh restart - it kills the service which starts automatically again
 sh restart_dbus-serial-battery - kills all instances of Serial Battery, reninstalls files and starts again
 If you restart the Serial Battery, wait until all instances are visible, assign CustomNames and restart the Aggregate Batteries 
-
-
 
 For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: python3 aggregatebatteries.py
 
