@@ -595,11 +595,10 @@ class DbusAggBatService(object):
                 if not self._dynamicCVL:
                     self._dynamicCVL = True
                     logging.info('%s: Dynamic CVL reduction started.'  % (dt.now()).strftime('%c'))
-                    
-                self._DCfeedActive = self._dbusMon.dbusmon.get_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn')    # check if DC-feed enabled
+                    self._DCfeedActive = self._dbusMon.dbusmon.get_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn')    # check if DC-feed enabled
+                
                 self._dbusMon.dbusmon.set_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn', 0)                      # disable DC-coupled PV feed-in
                 MaxChargeVoltage = min((min(chargeVoltageReduced_list)), ChargeVoltageBattery)                                              # avoid exceeding MAX_CELL_VOLTAGE
-                #self._ownCharge = InstalledCapacity                                                                                        # reset Coulumb counter to 100%
             
             else:     
                 MaxChargeVoltage = ChargeVoltageBattery
