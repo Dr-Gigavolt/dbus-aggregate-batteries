@@ -563,7 +563,7 @@ class DbusAggBatService(object):
        
                 if self._balancing == 1:
                     ChargeVoltageBattery = CVL_BALANCING
-                    if (Voltage >= 0.99 * CVL_BALANCING):
+                    if (Voltage >= 0.999 * CVL_BALANCING):
                         self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
                         if ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):
                             self._balancing = 2;
@@ -582,7 +582,7 @@ class DbusAggBatService(object):
                 if self._balancing == 0:
                     ChargeVoltageBattery = CVL_NORMAL
                     
-            elif (time_unbalanced > 0) and (Voltage >= 0.99 * CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):   # if normal charging voltage is 100% SoC and balancing is finished
+            elif (time_unbalanced > 0) and (Voltage >= 0.999 * CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):   # if normal charging voltage is 100% SoC and balancing is finished
                 self._ownCharge = InstalledCapacity                                                 # reset Coulumb counter to 100%
                 logging.info('%s: Balancing goal reached with full charging set as normal. Updating last_balancing file.'  % (dt.now()).strftime('%c'))
                 self._lastBalancing = int((dt.now()).strftime('%j'))
@@ -595,7 +595,8 @@ class DbusAggBatService(object):
                 if not self._dynamicCVL:
                     self._dynamicCVL = True
                     logging.info('%s: Dynamic CVL reduction started.'  % (dt.now()).strftime('%c'))
-                    self._DCfeedActive = self._dbusMon.dbusmon.get_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn')    # check if DC-feed enabled
+                    if self._DCfeedActive == False:                                                                                         # avoid periodic readout if once set True
+                        self._DCfeedActive = self._dbusMon.dbusmon.get_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn')    # check if DC-feed enabled
                 
                 self._dbusMon.dbusmon.set_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn', 0)                      # disable DC-coupled PV feed-in
                 MaxChargeVoltage = min((min(chargeVoltageReduced_list)), ChargeVoltageBattery)                                              # avoid exceeding MAX_CELL_VOLTAGE
@@ -609,7 +610,8 @@ class DbusAggBatService(object):
                 
                 if ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX) and self._DCfeedActive:                                              # re-enable DC-feed if it was enabled before
                     self._dbusMon.dbusmon.set_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn', 1)                  # enable DC-coupled PV feed-in
-                    logging.info('%s: DC-coupled PV feed-in re-activated.'  % (dt.now()).strftime('%c'))  
+                    logging.info('%s: DC-coupled PV feed-in re-activated.'  % (dt.now()).strftime('%c'))
+                    self._DCfeedActive = False                                                                            #reset to prevent permanent logging and activation of  /Settings/CGwacs/OvervoltageFeedIn        
                                                       
             if (MinCellVoltage <= MIN_CELL_VOLTAGE) and ZERO_SOC:
                 self._ownCharge = 0                                                                                                         # reset Coulumb counter to 0%                 
