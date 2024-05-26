@@ -13,7 +13,7 @@ Please report the bugs and propose improvements. Many thanks to all who already 
 Installation:
 - create /data/dbus-aggregate-batteries directory
 - copy the stuff into it
-- set chmod 744 for ./service/run and ./restart
+- set chmod 744 for ./service/run, ./service/log/run and ./restart
 - set the parameters in ./settings.py (please read comments to understand the function and adjust the parameters)
 - write initial charge guess (in A.h) into ./charge
 - add command ln -s /data/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries into /data/rc.local 
@@ -26,7 +26,7 @@ If you restart the Serial Battery, wait until all instances are visible, assign 
 
 For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: python3 aggregatebatteries.py
 
-Logging file: aggregatebatteries.log
+Logging file: `tail -F /var/log/dbus-aggregate-batteries/current | tai64nlocal`
 
 If you wish to mount the code into /opt/victronenergy/ follow these instructions:
 https://github.com/Dr-Gigavolt/dbus-aggregate-batteries/issues/24
