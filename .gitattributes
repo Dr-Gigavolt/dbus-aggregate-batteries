@@ -1,2 +1,4 @@
 # Auto detect text files and perform LF normalization
-* text=auto
+* text=auto eol=lf
+*.{sh,[sS][hH]} text eol=lf
+*.{py,pyb} text eol=lf
