@@ -30,9 +30,6 @@ from threading import Thread
 sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "3.1"
-
-
 class DbusAggBatService(object):
 
     def __init__(self, servicename="com.victronenergy.battery.aggregate"):
