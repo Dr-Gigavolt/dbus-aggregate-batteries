@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Version 3.1
 
 import sys
 import logging
