@@ -563,11 +563,9 @@ class DbusAggBatService(object):
        
                 if self._balancing == 1:
                     ChargeVoltageBattery = CVL_BALANCING
-                    if (Voltage >= 0.999 * CVL_BALANCING):
-                        self._ownCharge = InstalledCapacity                                         # reset Coulumb counter to 100%
-                        if ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):
-                            self._balancing = 2;
-                            logging.info('%s: Balancing goal reached.'  % (dt.now()).strftime('%c'))    
+                    if (Voltage >= CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):
+                        self._balancing = 2;
+                        logging.info('%s: Balancing goal reached.'  % (dt.now()).strftime('%c'))    
             
                 if self._balancing >= 2:
                     ChargeVoltageBattery = CVL_BALANCING                                            # keep balancing voltage at balancing day until decrease of solar powers and   
@@ -582,13 +580,16 @@ class DbusAggBatService(object):
                 if self._balancing == 0:
                     ChargeVoltageBattery = CVL_NORMAL
                     
-            elif (time_unbalanced > 0) and (Voltage >= 0.999 * CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):   # if normal charging voltage is 100% SoC and balancing is finished
-                self._ownCharge = InstalledCapacity                                                 # reset Coulumb counter to 100%
+            elif (time_unbalanced > 0) and (Voltage >= CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < CELL_DIFF_MAX):   # if normal charging voltage is 100% SoC and balancing is finished
                 logging.info('%s: Balancing goal reached with full charging set as normal. Updating last_balancing file.'  % (dt.now()).strftime('%c'))
                 self._lastBalancing = int((dt.now()).strftime('%j'))
                 self._lastBalancing_file = open('/data/dbus-aggregate-batteries/last_balancing', 'w')
                 self._lastBalancing_file.write('%s' % self._lastBalancing)
                 self._lastBalancing_file.close()
+            
+            if Voltage >= CVL_BALANCING:
+                self._ownCharge = InstalledCapacity                                                 # reset Coulumb counter to 100%
+            
             
             # manage dynamic CVL reduction 
             if MaxCellVoltage >= MAX_CELL_VOLTAGE:                         
@@ -599,6 +600,7 @@ class DbusAggBatService(object):
                         self._DCfeedActive = self._dbusMon.dbusmon.get_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn')    # check if DC-feed enabled
                 
                 self._dbusMon.dbusmon.set_value('com.victronenergy.settings', '/Settings/CGwacs/OvervoltageFeedIn', 0)                      # disable DC-coupled PV feed-in
+                logging.info('%s: DC-coupled PV feed-in de-activated.'  % (dt.now()).strftime('%c'))
                 MaxChargeVoltage = min((min(chargeVoltageReduced_list)), ChargeVoltageBattery)                                              # avoid exceeding MAX_CELL_VOLTAGE
             
             else:     
@@ -773,8 +775,7 @@ class DbusAggBatService(object):
 
 def main():
 
-    logging.basicConfig(level=logging.INFO)
-
+    logging.basicConfig(level=logging.INFO)    
     logging.info('%s: Starting AggregateBatteries.' % (dt.now()).strftime('%c'))
     from dbus.mainloop.glib import DBusGMainLoop
     DBusGMainLoop(set_as_default=True)
@@ -785,4 +786,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
