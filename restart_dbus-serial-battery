@@ -1,3 +1,0 @@
-#!/bin/bash
-cp -f /data/etc/dbus-serialbattery/config.ini /opt/victronenergy/dbus-serialbattery &>/dev/null	# SerialBattery configured by config.ini
-kill $(pgrep -f 'python /opt/victronenergy/dbus-serialbattery/dbus-serialbattery.py')
