@@ -775,11 +775,7 @@ class DbusAggBatService(object):
 
 def main():
 
-    if LOGGING == 1:    # print to console
-        logging.basicConfig(level=logging.INFO)        
-    elif LOGGING == 2:  # print to file   
-        logging.basicConfig(filename = '/data/dbus-aggregate-batteries/aggregatebatteries.log', level=logging.INFO)
-    
+    logging.basicConfig(level=logging.INFO)    
     logging.info('%s: Starting AggregateBatteries.' % (dt.now()).strftime('%c'))
     from dbus.mainloop.glib import DBusGMainLoop
     DBusGMainLoop(set_as_default=True)
@@ -790,4 +786,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
