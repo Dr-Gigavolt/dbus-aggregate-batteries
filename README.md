@@ -10,7 +10,7 @@ Attention: This is my first experience with the Victron system. I offer it "as i
 
 Please report the bugs and propose improvements. Many thanks to all who already participated. According previous experience I prefer if you attach a piece of code instead of creating a merge request. And please understand, that I'm not able to include all proposals, this would make the program too complex and difficult to maintain.
 
-## Many thanks to Mr-Manuel for adding install scripts and improve logging
+#### Many thanks to Mr-Manuel for adding install scripts and improve logging
 
 ## Installation
 - execute this commands:
