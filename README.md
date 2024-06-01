@@ -10,6 +10,8 @@ Attention: This is my first experience with the Victron system. I offer it "as i
 
 Please report the bugs and propose improvements. Many thanks to all who already participated. According previous experience I prefer if you attach a piece of code instead of creating a merge request. And please understand, that I'm not able to include all proposals, this would make the program too complex and difficult to maintain.
 
+## Many thanks to Mr-Manuel for adding install scripts and improve logging
+
 ## Installation
 - execute this commands:
   ```bash
@@ -17,6 +19,9 @@ Please report the bugs and propose improvements. Many thanks to all who already 
 
   bash /tmp/install.sh
   ```
+
+(or copy the files or clone the repository as before and execute reinstall-local.sh - the script sets the symlink and permissions, no need to do it manually)
+
 - set the parameters in `./settings.py` (please read comments to understand the function and adjust the parameters)
 - write initial charge guess (in Ah) into `./charge`
 
@@ -31,7 +36,7 @@ If you restart the Serial Battery, wait until all instances are visible, assign 
 
 For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: `python3 /data/dbus-aggregate-batteries/aggregatebatteries.py`
 
-Logging file: `tail -F /var/log/dbus-aggregate-batteries/current | tai64nlocal`
+Logging file: `tail -F /var/log/dbus-aggregate-batteries/current` or use any text file editor.
 
 If you wish to mount the code into `/opt/victronenergy/` follow these instructions:
 https://github.com/Dr-Gigavolt/dbus-aggregate-batteries/issues/24
