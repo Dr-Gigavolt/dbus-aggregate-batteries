@@ -72,12 +72,12 @@ CHARGE_VOLTAGE_LIST = [
     2.45,  # January
     2.45,  # February
     2.42,  # March
-    2.40,  # April
+    2.42,  # April
     2.40,  # May
-    2.35,  # June
-    2.35,  # July
-    2.35,  # August
-    2.40,  # September
+    2.40,  # June
+    2.40,  # July
+    2.40,  # August
+    2.42,  # September
     2.42,  # October
     2.45,  # November
     2.45,  # December
@@ -93,7 +93,7 @@ MIN_CELL_HYSTERESIS = 0.1
 # go back from BALANCING_VOLTAGE to CHARGE_VOLTAGE
 CELL_DIFF_MAX = 0.015
 # Ah fed into batteries are multiplied by efficiency
-BATTERY_EFFICIENCY = 0.98
+BATTERY_EFFICIENCY = 0.985
 
 # Max. charge current at normal conditions
 MAX_CHARGE_CURRENT = 300

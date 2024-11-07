@@ -30,7 +30,7 @@ from threading import Thread
 sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "3.2"
+VERSION = "3.3"
 
 
 class DbusAggBatService(object):
@@ -319,7 +319,7 @@ class DbusAggBatService(object):
                     productName = self._dbusMon.dbusmon.get_value(
                         service, settings.BATTERY_PRODUCT_NAME_PATH
                     )
-                    if settings.BATTERY_PRODUCT_NAME in productName:
+                    if (productName != None) and (settings.BATTERY_PRODUCT_NAME in productName):
 
                         # Custom name, if exists, Marvo2011
                         try:
@@ -380,7 +380,7 @@ class DbusAggBatService(object):
                         # end of section, Marvo2011
 
                     elif (
-                        settings.SMARTSHUNT_NAME_KEY_WORD in productName
+                        (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
                     ):  # if SmartShunt found, can be used for DC load current
                         self._smartShunt = service
 
@@ -606,14 +606,14 @@ class DbusAggBatService(object):
                     Soc += self._dbusMon.dbusmon.get_value(
                         self._batteries_dict[i], "/Soc"
                     ) * self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Capacity"
+                        self._batteries_dict[i], "/InstalledCapacity"
                     )
                     ttg = self._dbusMon.dbusmon.get_value(
                         self._batteries_dict[i], "/TimeToGo"
                     )
                     if (ttg is not None) and (TimeToGo is not None):
                         TimeToGo += ttg * self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/Capacity"
+                            self._batteries_dict[i], "/InstalledCapacity"
                         )
                     else:
                         TimeToGo = None
@@ -826,8 +826,8 @@ class DbusAggBatService(object):
             logging.error("Occured during step %s, Battery %s." % (step, i))
             logging.error("Read trial nr. %d" % self._readTrials)
             if self._readTrials > settings.READ_TRIALS:
-                logging.error(
-                    "%s: DBus read failed. Exiting." % (dt.now()).strftime("%c")
+                    logging.error(
+                        "%s: DBus read failed. Exiting." % (dt.now()).strftime("%c")
                 )
                 sys.exit()
             else:
@@ -1127,9 +1127,9 @@ class DbusAggBatService(object):
             else:
                 TimeToGo = None
         else:
-            Soc = Soc / Capacity  # weighted sum
+            Soc = Soc / InstalledCapacity  # weighted sum
             if TimeToGo is not None:
-                TimeToGo = TimeToGo / Capacity  # weighted sum
+                TimeToGo = TimeToGo / InstalledCapacity  # weighted sum
 
         #######################
         # Send values to DBus #
