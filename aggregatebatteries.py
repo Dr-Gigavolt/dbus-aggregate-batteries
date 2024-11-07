@@ -826,8 +826,8 @@ class DbusAggBatService(object):
             logging.error("Occured during step %s, Battery %s." % (step, i))
             logging.error("Read trial nr. %d" % self._readTrials)
             if self._readTrials > settings.READ_TRIALS:
-                    logging.error(
-                        "%s: DBus read failed. Exiting." % (dt.now()).strftime("%c")
+                logging.error(
+                    "%s: DBus read failed. Exiting." % (dt.now()).strftime("%c")
                 )
                 sys.exit()
             else:
