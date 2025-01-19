@@ -18,6 +18,7 @@ class DbusMon:
                 "/Connected": dummy,
                 "/ProductName": dummy,
                 "/CustomName": dummy,
+                "/Serial": dummy,
                 "/Mgmt/Connection": dummy,
                 "/DeviceInstance": dummy,
                 "/Dc/0/Voltage": dummy,

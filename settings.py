@@ -23,7 +23,8 @@ BATTERY_PRODUCT_NAME_PATH = "/ProductName"
 # Key world to identify the batteries (to exclude SmartShunt)
 BATTERY_PRODUCT_NAME = "SerialBattery"
 # if CustomName doesn't exist, set '/ProductName'
-BATTERY_INSTANCE_NAME_PATH = "/CustomName"
+# BATTERY_INSTANCE_NAME_PATH = "/CustomName"
+BATTERY_INSTANCE_NAME_PATH = "/Serial"
 # Key world to identify service of Multis/Quattros (or cluster of them)
 MULTI_KEY_WORD = "com.victronenergy.vebus"
 # Key world to identify services of solar chargers
@@ -63,7 +64,7 @@ OWN_CHARGE_PARAMETERS = True
 # or use them from battery driver (False)
 
 # This voltage per cell will be set periodically and kept until balancing below CELL_DIFF_MAX and next charge cycle
-BALANCING_VOLTAGE = 2.45
+BALANCING_VOLTAGE = 2.5
 # in days
 BALANCING_REPETITION = 10
 
@@ -84,7 +85,7 @@ CHARGE_VOLTAGE_LIST = [
 ]
 
 # If reached by 1-st cell, the CVL is dynamically limited. DC-coupled PV feed-in will be disabled to enable the CCL.
-MAX_CELL_VOLTAGE = 2.5
+MAX_CELL_VOLTAGE = 2.55
 # If reached, discharge current set to zero
 MIN_CELL_VOLTAGE = 1.9
 # Allow discharge above MIN_CELL_VOLTAGE + MIN_CELL_HYSTERESIS
@@ -96,7 +97,7 @@ CELL_DIFF_MAX = 0.015
 BATTERY_EFFICIENCY = 0.985
 
 # Max. charge current at normal conditions
-MAX_CHARGE_CURRENT = 300
+MAX_CHARGE_CURRENT = 200
 # Max. discharge current at normal conditions
 MAX_DISCHARGE_CURRENT = 200
 
@@ -111,7 +112,7 @@ CELL_CHARGE_LIMITING_VOLTAGE = [
     BALANCING_VOLTAGE,
     MAX_CELL_VOLTAGE,
 ]  # [min, ... ,max]; low voltage: limiting current from grid
-CELL_CHARGE_LIMITED_CURRENT = [0.2, 1, 1, 0.05, 0]
+CELL_CHARGE_LIMITED_CURRENT = [0.2, 1, 1, 0.1, 0]
 # [min, ... ,max]
 CELL_DISCHARGE_LIMITING_VOLTAGE = [
     MIN_CELL_VOLTAGE,
@@ -141,4 +142,4 @@ SEND_CELL_VOLTAGES = 0
 # 0: no logging, 1: print to console, 2: print to file
 LOGGING = 2
 # in seconds; if 0, periodic logging is disabled
-LOG_PERIOD = 900
+LOG_PERIOD = 300
