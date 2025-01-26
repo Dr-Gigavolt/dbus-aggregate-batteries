@@ -312,9 +312,10 @@ class DbusAggBatService(object):
             "%s: Searching batteries: Trial Nr. %d"
             % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
         )
-
         try:  # if Dbus monitor not running yet, new trial instead of exception
             for service in self._dbusConn.list_names():
+                if "com.victronenergy" in service:
+                    logging.info("Dbusmonitor sees: %s" % service)
                 if settings.BATTERY_SERVICE_NAME in service:
                     productName = self._dbusMon.dbusmon.get_value(
                         service, settings.BATTERY_PRODUCT_NAME_PATH
