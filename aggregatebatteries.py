@@ -315,13 +315,13 @@ class DbusAggBatService(object):
         try:  # if Dbus monitor not running yet, new trial instead of exception
             for service in self._dbusConn.list_names():
                 if "com.victronenergy" in service:
-                    logging.info("Dbusmonitor sees: %s" % service)
+                    logging.info("%s: Dbusmonitor sees: %s" % ((dt.now()).strftime("%c"), service))
                 if settings.BATTERY_SERVICE_NAME in service:
                     productName = self._dbusMon.dbusmon.get_value(
                         service, settings.BATTERY_PRODUCT_NAME_PATH
                     )
                     if (productName != None) and (settings.BATTERY_PRODUCT_NAME in productName):
-
+                        logging.info("%s: Correct battery product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
                         # Custom name, if exists, Marvo2011
                         try:
                             BatteryName = self._dbusMon.dbusmon.get_value(
@@ -384,6 +384,7 @@ class DbusAggBatService(object):
                         (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
                     ):  # if SmartShunt found, can be used for DC load current
                         self._smartShunt = service
+                        logging.info("%s: Correct Smart Shunt product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
 
         except Exception:
             pass
