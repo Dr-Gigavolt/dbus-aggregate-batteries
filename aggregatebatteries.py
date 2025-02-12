@@ -662,11 +662,11 @@ class DbusAggBatService(object):
                 )
                 
                 # here an exception is raised and new read trial initiated if None is on Dbus
-                volt_sum_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Sum")
+                volt_sum_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Cell/Sum")
                 if volt_sum_get != None:
                     VoltagesSum_dict[i] = volt_sum_get
                 else:
-                    raise TypeError(f"Battery {i} returns None value of /Voltages/Sum.")
+                    raise TypeError(f"Battery {i} returns None value of /Cell/Sum.")
 
                 # Battery state
                 step = "Read battery state"
