@@ -1,4 +1,4 @@
-## Version 3.3
+## Version 3.4
 
 Attention: This is my first experience with the Victron system. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in `settings.py`. None of them is universal, you have to adapt everything to your system.
 
