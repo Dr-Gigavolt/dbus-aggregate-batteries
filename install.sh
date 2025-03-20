@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # download and install the latest version of the script
-latest_release=$(curl -s https://api.github.com/repos/Dr-Gigavolt/dbus-aggregate-batteries/releases/latest | grep "tag_name" | cut -d : -f 2,3 | tr -d "\ " | tr -d \" | tr -d \,)
+latest_release=$(curl -s https://api.github.com/repos/Dr-Gigavolt/dbus-aggregate-batteries/releases/latest \
+  | grep 'tag_name' \
+  | sed -E 's/.*"tag_name": "([^"]+)".*/\1/')
+
 
 echo "Downloading latest release: $latest_release"
 
