@@ -48,6 +48,7 @@ class DbusAggBatService(object):
         self._MaxDischargeCurrent_old = 0
         # implementing hysteresis for allowing discharge
         self._fullyDischarged = False
+        # TODO by guru: enhance the following statement according dbushelper.py / 54
         self._dbusservice = VeDbusService(servicename)
         self._dbusConn = (
             dbus.SessionBus()
