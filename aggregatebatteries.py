@@ -18,6 +18,7 @@ from gi.repository import GLib
 import logging
 import sys
 import os
+import platform
 import dbus
 import re
 import settings
@@ -30,8 +31,20 @@ from threading import Thread
 sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "3.4"
+VERSION = "3.41"
 
+class SystemBus(dbus.bus.BusConnection):
+    def __new__(cls):
+        return dbus.bus.BusConnection.__new__(cls, dbus.bus.BusConnection.TYPE_SYSTEM)
+
+
+class SessionBus(dbus.bus.BusConnection):
+    def __new__(cls):
+        return dbus.bus.BusConnection.__new__(cls, dbus.bus.BusConnection.TYPE_SESSION)
+
+
+def get_bus() -> dbus.bus.BusConnection:
+    return SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
 
 class DbusAggBatService(object):
 
@@ -48,12 +61,10 @@ class DbusAggBatService(object):
         self._MaxDischargeCurrent_old = 0
         # implementing hysteresis for allowing discharge
         self._fullyDischarged = False
-        self._dbusservice = VeDbusService(servicename)
-        self._dbusConn = (
-            dbus.SessionBus()
-            if "DBUS_SESSION_BUS_ADDRESS" in os.environ
-            else dbus.SystemBus()
-        )
+        self._dbusConn = get_bus()
+        logging.info("### Initialise VeDbusService ")
+        self._dbusservice = VeDbusService(servicename, self._dbusConn, register=False)
+        logging.info("#### Done: Init of VeDbusService ")
         self._timeOld = tt.time()
         # written when dynamic CVL limit activated
         self._DCfeedActive = False
@@ -110,18 +121,20 @@ class DbusAggBatService(object):
                 )
                 sys.exit()
 
+        # Create the management objects, as specified in the ccgx dbus-api document
+        self._dbusservice.add_path("/Mgmt/ProcessName", __file__)
+        self._dbusservice.add_path("/Mgmt/ProcessVersion", "Python " + platform.python_version())
+        self._dbusservice.add_path("/Mgmt/Connection", "Virtual")
+
         # Create the mandatory objects
-        self._dbusservice.add_mandatory_paths(
-            processname=__file__,
-            processversion="0.0",
-            connection="Virtual",
-            deviceinstance=0,
-            productid=0,
-            productname="AggregateBatteries",
-            firmwareversion=VERSION,
-            hardwareversion="0.0",
-            connected=1,
-        )
+        self._dbusservice.add_path("/DeviceInstance", 99)
+        # this product ID was randomly selected - please exchange, if interference with another component
+        self._dbusservice.add_path("/ProductId", 0xBA44)
+        self._dbusservice.add_path("/ProductName", "AggregateBatteries")
+        self._dbusservice.add_path("/FirmwareVersion", VERSION)
+        self._dbusservice.add_path("/HardwareVersion", VERSION)
+        self._dbusservice.add_path("/Connected", 1)
+        
 
         # Create DC paths
         self._dbusservice.add_path(
@@ -244,6 +257,10 @@ class DbusAggBatService(object):
         self._dbusservice.add_path("/Io/AllowToDischarge", None, writeable=True)
         self._dbusservice.add_path("/Io/AllowToBalance", None, writeable=True)
 
+        # register VeDbusService after all paths where added
+        logging.info("### Registering VeDbusService")
+        self._dbusservice.register()
+        
         x = Thread(target=self._startMonitor)
         x.start()
 
@@ -365,6 +382,7 @@ class DbusAggBatService(object):
                                     gettextcallback=lambda a, x: "{:.3f}V".format(x),
                                 )
 
+                        
                         # Check if Nr. of cells is equal
                         if (
                             self._dbusMon.dbusmon.get_value(
@@ -660,13 +678,13 @@ class DbusAggBatService(object):
                 ] = self._dbusMon.dbusmon.get_value(
                     self._batteries_dict[i], "/System/MinCellVoltage"
                 )
-                
-                # here an exception is raised and new read trial initiated if None is on Dbus
+
+                 # here an exception is raised and new read trial initiated if None is on Dbus
                 volt_sum_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Sum")
                 if volt_sum_get != None:
                     VoltagesSum_dict[i] = volt_sum_get
                 else:
-                    raise TypeError(f"Battery {i} returns None value of /Voltages/Sum.")
+                    raise TypeError(f"Battery {i} returns None value of /Voltages/Sum. Please check, if the setting 'BATTERY_CELL_DATA_FORMAT=1' in dbus-serialbattery config.")
 
                 # Battery state
                 step = "Read battery state"
