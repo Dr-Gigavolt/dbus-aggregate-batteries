@@ -1,4 +1,4 @@
-## Version 3.4.1
+## Version 3.5
 
 Attention: This is my first experience with the Victron system. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in `settings.py`. I extended the description after some users misunderstood it. Please execute command dbus-spy on your Venus OS and review all paths transmitted by Serial Battery instances.
 
