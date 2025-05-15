@@ -887,10 +887,16 @@ class DbusAggBatService(object):
 
         # find max. charge voltage (if needed)
         if not settings.OWN_CHARGE_PARAMETERS:
-            MaxChargeVoltage = self._fn._min(MaxChargeVoltage_list)  # add KEEP_MAX_CVL
+            if KEEP_MAX_CVL and ("Float" in ChargeMode_list):
+                MaxChargeVoltage = self._fn._max(MaxChargeVoltage_list)
+                    
+            else:
+                MaxChargeVoltage = self._fn._min(MaxChargeVoltage_list)
+                
             MaxChargeCurrent = (
                 self._fn._min(MaxChargeCurrent_list) * settings.NR_OF_BATTERIES
             )
+            
             MaxDischargeCurrent = (
                 self._fn._min(MaxDischargeCurrent_list) * settings.NR_OF_BATTERIES
             )
@@ -1042,8 +1048,8 @@ class DbusAggBatService(object):
                     0,
                 )  # disable DC-coupled PV feed-in
                 logging.info(
-                    "%s: DC-coupled PV feed-in de-activated."
-                    % (dt.now()).strftime("%c")
+                    "%s: DC-coupled PV feed-in de-activated due to max. cell voltage: %s %.3fV."
+                    % ((dt.now()).strftime("%c"), MaxVoltageCellId, MaxCellVoltage)
                 )
                 MaxChargeVoltage = min(
                     (min(chargeVoltageReduced_list)), ChargeVoltageBattery
