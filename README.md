@@ -1,4 +1,4 @@
-## Version 3.5.20250515
+## Version 3.5.20250516
 
 Attention: This is my first experience with the Victron system. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in `settings.py`. I extended the description after some users misunderstood it. Please execute command dbus-spy on your Venus OS and review all paths transmitted by Serial Battery instances.
 
@@ -6,7 +6,7 @@ Attention: This is my first experience with the Victron system. I offer it "as i
 - 3x MultiPlus-II 48/5000/70-50
 - 1x SmartSolar MPPT VE.Can 250/100
 - 1x Fronius Symo 15.0-3-M
-- 2x LTO batteries 22S x 5P with JK BMS 2A24S20P
+- 2x LTO batteries 24S x 5P with JK BMS 2A24S20P
 
 Please report the bugs and propose improvements. Many thanks to all who already participated. According previous experience I prefer if you attach a piece of code instead of creating a merge request. And please understand, that I'm not able to include all proposals, this would make the program too complex and difficult to maintain.
 

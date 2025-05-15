@@ -4,7 +4,7 @@
 
 # Nr. of physical batteries to be aggregated. Smart shunt for battery current is not needed and not supported.
 NR_OF_BATTERIES = 2
-NR_OF_CELLS_PER_BATTERY = 22
+NR_OF_CELLS_PER_BATTERY = 24
 
 # Nr. of MPPTs
 NR_OF_MPPTS = 1
@@ -65,7 +65,7 @@ CURRENT_FROM_VICTRON = True
 OWN_SOC = True
 
 # Allow zeroing program's own charge counter at MIN_CELL_VOLTAGE. At full battery it is always set to 100%.
-ZERO_SOC = True
+ZERO_SOC = False
 
 # When the battery charge changes more than CHARGE_SAVE_PRECISION, the "charge" file is updated.
 # It is a trade-off between resolution and file access frequency. The value is relative.
@@ -94,18 +94,18 @@ BALANCING_REPETITION = 10
 # Set up how full the battery has to be charged in given month. Set lower values in summer
 # to prolong battery life and higher values in winter to have more energy available.
 CHARGE_VOLTAGE_LIST = [
-    2.45,  # January
+    2.5,  # January
     2.45,  # February
-    2.42,  # March
-    2.42,  # April
-    2.40,  # May
-    2.40,  # June
-    2.40,  # July
-    2.40,  # August
-    2.42,  # September
-    2.42,  # October
+    2.45,  # March
+    2.40,  # April
+    2.35,  # May
+    2.30,  # June
+    2.30,  # July
+    2.35,  # August
+    2.40,  # September
+    2.45,  # October
     2.45,  # November
-    2.45,  # December
+    2.5,  # December
 ]
 
 # This is a cell-full protection feature. If MAX_CELL_VOLTAGE is reached by at least one cell,

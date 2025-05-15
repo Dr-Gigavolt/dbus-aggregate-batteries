@@ -68,6 +68,8 @@ class DbusAggBatService(object):
         self._timeOld = tt.time()
         # written when dynamic CVL limit activated
         self._DCfeedActive = False
+        # Set True when starting dynamic CVL reduction. Set False when balancing is finished.
+        self._dynCVLactivated = False
         # 0: inactive; 1: goal reached, waiting for discharging under nominal voltage; 2: nominal voltage reached
         self._balancing = 0
         # Day in year
@@ -1029,28 +1031,31 @@ class DbusAggBatService(object):
 
             # manage dynamic CVL reduction
             if MaxCellVoltage >= settings.MAX_CELL_VOLTAGE:
-                if not self._dynamicCVL:
+                if not self._dynamicCVL: 
                     self._dynamicCVL = True
                     logging.info(
-                        "%s: Dynamic CVL reduction started." % (dt.now()).strftime("%c")
+                        f"{(dt.now()).strftime('%c')}: Dynamic CVL reduction started due to max. cell voltage: {MaxVoltageCellId} {MaxCellVoltage:.3f}V."
                     )
-                    if (
-                        self._DCfeedActive is False
-                    ):  # avoid periodic readout if once set True
+                    if not self._dynCVLactivated:       # avoid periodic readout  
+                        self._dynCVLactivated = True
                         self._DCfeedActive = self._dbusMon.dbusmon.get_value(
                             "com.victronenergy.settings",
                             "/Settings/CGwacs/OvervoltageFeedIn",
                         )  # check if DC-feed enabled
 
-                self._dbusMon.dbusmon.set_value(
-                    "com.victronenergy.settings",
-                    "/Settings/CGwacs/OvervoltageFeedIn",
-                    0,
-                )  # disable DC-coupled PV feed-in
-                logging.info(
-                    "%s: DC-coupled PV feed-in de-activated due to max. cell voltage: %s %.3fV."
-                    % ((dt.now()).strftime("%c"), MaxVoltageCellId, MaxCellVoltage)
-                )
+                        self._dbusMon.dbusmon.set_value(
+                            "com.victronenergy.settings",
+                            "/Settings/CGwacs/OvervoltageFeedIn",
+                            0,
+                        )  # disable DC-coupled PV feed-in
+                    
+                        if (self._DCfeedActive == 0):
+                            logging.info(
+                                f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in was not active.")
+                        else:    
+                            logging.info(
+                                f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in de-activated.")
+ 
                 MaxChargeVoltage = min(
                     (min(chargeVoltageReduced_list)), ChargeVoltageBattery
                 )  # avoid exceeding MAX_CELL_VOLTAGE
@@ -1064,21 +1069,20 @@ class DbusAggBatService(object):
                         "%s: Dynamic CVL reduction finished."
                         % (dt.now()).strftime("%c")
                     )
-
-                if (
-                    (MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX
-                ) and self._DCfeedActive:  # re-enable DC-feed if it was enabled before
-                    self._dbusMon.dbusmon.set_value(
-                        "com.victronenergy.settings",
-                        "/Settings/CGwacs/OvervoltageFeedIn",
-                        1,
-                    )  # enable DC-coupled PV feed-in
-                    logging.info(
-                        "%s: DC-coupled PV feed-in re-activated."
-                        % (dt.now()).strftime("%c")
-                    )
-                    # reset to prevent permanent logging and activation of  /Settings/CGwacs/OvervoltageFeedIn
-                    self._DCfeedActive = False
+                    if (MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX:
+                        self._dbusMon.dbusmon.set_value(
+                            "com.victronenergy.settings",
+                            "/Settings/CGwacs/OvervoltageFeedIn",
+                            self._DCfeedActive,
+                        )  # re-enable DC-feed if it was enabled before
+                        if self._DCfeedActive:
+                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in re-activated after succeeded balancing.")
+                        else:
+                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in was not active before and was not activated.")
+                        
+                        # reset to prevent permanent logging and activation of  /Settings/CGwacs/OvervoltageFeedIn
+                        self._DCfeedActive = False
+                        self._dynCVLactivated = False
 
             if (MinCellVoltage <= settings.MIN_CELL_VOLTAGE) and settings.ZERO_SOC:
                 self._ownCharge = 0  # reset Coulumb counter to 0%
