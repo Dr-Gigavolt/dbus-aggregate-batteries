@@ -889,7 +889,7 @@ class DbusAggBatService(object):
 
         # find max. charge voltage (if needed)
         if not settings.OWN_CHARGE_PARAMETERS:
-            if KEEP_MAX_CVL and ("Float" in ChargeMode_list):
+            if settings.KEEP_MAX_CVL and ("Float" in ChargeMode_list):
                 MaxChargeVoltage = self._fn._max(MaxChargeVoltage_list)
                     
             else:
