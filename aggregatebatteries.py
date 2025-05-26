@@ -432,25 +432,25 @@ class DbusAggBatService(object):
                         (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
                     ):  # if SmartShunt found, can be used for DC load current
                         smartShuntCount += 1
-                        logging.info("%s: Found Smart Shunt #%d, product name %s (%s) found in the service %s" % ((dt.now()).strftime("%c"), smartShuntCount, productName, customName, service))
+                        logging.info("%s: Found Smart Shunt #%d, product name %s (%s), in the service %s" % ((dt.now()).strftime("%c"), smartShuntCount, productName, customName, service))
                         if use_multiple_smartshunts:
                             include_shunt = True
                             if isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)):
                                 include_shunt = (smartShuntCount in settings.MULTIPLE_SMARTSHUNTS)
                             if include_shunt:
                                 self._smartShunt_list.append(service)
-                                logging.info("%s: Adding Smart Shunt #%d (%s) to DC Load" % ((dt.now()).strftime("%c"), smartShuntCount, customName))
+                                logging.info("%s: Adding Smart Shunt #%d (%s) to monitor DC Load" % ((dt.now()).strftime("%c"), smartShuntCount, customName))
                         else:
                             if (len(self._smartShunt_list) == 0):
                                 self._smartShunt_list.append(service)
                             self._smartShunt_list[0] = service # make sure last SmartShunt is used to stick to original behavior
-                            logging.info("%s: Now only using Smart Shunt #%d (%s) as DC Load" % ((dt.now()).strftime("%c"), smartShuntCount, customName))
+                            logging.info("%s: Now only using Smart Shunt #%d (%s) to monitor DC Load" % ((dt.now()).strftime("%c"), smartShuntCount, customName))
 
         except Exception:
             pass
         if len(self._smartShunt_list) > 0:
             logging.info(
-                "%s: %d batteries and %d SmartShunts found." % ((dt.now()).strftime("%c"), batteriesCount, len(self._smartShunt_list))
+                "%s: %d batteries and %d SmartShunts (using %d) found." % ((dt.now()).strftime("%c"), batteriesCount, len(self._smartShunt_list), smartShuntCount)
             )
         else:
             logging.info(

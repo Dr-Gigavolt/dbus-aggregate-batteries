@@ -63,7 +63,7 @@ CURRENT_FROM_VICTRON = True
 # - False or an empty list is the original default behavior of using the last SmartShunt instance
 # - True uses all available SmartShunts
 # - a list of numbers allows using only certain SmartShunts, the numbers are in order of SmartShunt occurence as listed in dbus-spy or log file
-MULTIPLE_SMARTSHUNTS = False
+MULTIPLE_SMARTSHUNTS = True
 
 # Threshold below which to use sum of currents from SmartShunts as battery current
 # if SMARTSHUNT_CURRENT_THRESHOLD is <= 0 then the SmartShunt current aggregrate is always used
