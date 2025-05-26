@@ -329,8 +329,9 @@ class DbusAggBatService(object):
         self._batteries_dict = {}  # Marvo2011
         self._smartShunt_list = []
         batteriesCount = 0
-        Soc = 0
-        InstalledCapacity = 0
+        if self._ownCharge < 0:
+            Soc = 0
+            InstalledCapacity = 0
         productName = ""
         customName = ""
         logging.info(
@@ -966,7 +967,7 @@ class DbusAggBatService(object):
 
                 if settings.DC_LOADS:
                     Current_SHUNT = 0
-                    use_shunt_aggregate = false
+                    use_shunt_aggregate = False
                     for i in range(len(self._smartShunt_list)):
                             shunt_current = self._dbusMon.dbusmon.get_value(
                                 self._smartShunt_list[i], "/Dc/0/Current"
