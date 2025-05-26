@@ -407,7 +407,7 @@ class DbusAggBatService(object):
                     elif (
                         (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
                     ):  # if SmartShunt found, can be used for DC load current
-                        if (len(self._smartShunt_list) == 0) || settings.CURRENT_FROM_SMARTSHUNT:
+                        if (len(self._smartShunt_list) == 0) or settings.CURRENT_FROM_SMARTSHUNT:
                             self._smartShunt_list.append(service)
                         logging.info("%s: Correct Smart Shunt product name %s (%s) found in the service %s" % ((dt.now()).strftime("%c"), productName, customName, service))
 
@@ -934,7 +934,7 @@ class DbusAggBatService(object):
                                 self._smartShunt_list[i], "/Dc/0/Current"
                             )  # SmartShunt is monitored as a battery
                             Current_SHUNT += shunt_current
-                            if (abs(shunt_current) < settings.SMARTSHUNT_CURRENT_THRESHOLD) || (settings.SMARTSHUNT_CURRENT_THRESHOLD < 0):
+                            if (abs(shunt_current) < settings.SMARTSHUNT_CURRENT_THRESHOLD) or (settings.SMARTSHUNT_CURRENT_THRESHOLD < 0):
                                 use_shunt_aggregate = True # use SmartShunt aggregate if at least one is below the threshold
                     if use_shunt_aggregate:
                         if settings.INVERT_SMARTSHUNT:
