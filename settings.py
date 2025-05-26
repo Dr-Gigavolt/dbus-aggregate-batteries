@@ -13,7 +13,7 @@ NR_OF_MPPTS = 0
 DC_LOADS = True
 
 # False: Current subtracted, True: Current added
-INVERT_SMARTSHUNT = False
+INVERT_SMARTSHUNT = True
 
 # ######################################
 # ########### DBus settings ############
@@ -65,7 +65,7 @@ CURRENT_FROM_SMARTSHUNT = True
 
 # Threshold below which to use sum of currents from SmartShunts as battery current
 # if number is <= 0 then SmartShunt current aggregrate is always used
-SMARTSHUNT_CURRENT_THRESHOLD = 1.5
+SMARTSHUNT_CURRENT_THRESHOLD = -1
 
 # If True, the program's own charge counter is used instead of the BMS counters.
 # Necessary for JK BMS due to poor current measurement precision
