@@ -917,10 +917,15 @@ class DbusAggBatService(object):
         ####################################
 
         if settings.CURRENT_FROM_VICTRON:
+            Current_VE = 0
             try:
-                Current_VE = self._dbusMon.dbusmon.get_value(
-                    self._multi, "/Dc/0/Current"
-                )  # get DC current of multi/quattro (or system of them)
+                Multi_Connected = self._dbusMon.dbusmon.get_value(
+                    self._multi, "/Connected"
+                )
+                if Multi_Connected > 0:
+                    Current_VE += self._dbusMon.dbusmon.get_value(
+                        self._multi, "/Dc/0/Current"
+                    )  # get DC current of multi/quattro (or system of them)
                 for i in range(settings.NR_OF_MPPTS):
                     Current_VE += self._dbusMon.dbusmon.get_value(
                         self._mppts_list[i], "/Dc/0/Current"
