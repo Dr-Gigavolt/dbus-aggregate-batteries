@@ -489,44 +489,47 @@ class DbusAggBatService(object):
     # #########################################################################
 
     def _find_multis(self):
-        logging.info(
-            "%s: Searching Multi/Quattro VEbus: Trial Nr. %d"
-            % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
-        )
-        try:
-            for service in self._dbusConn.list_names():
-                if settings.MULTI_KEY_WORD in service:
-                    self._multi = service
-                    logging.info(
-                        "%s: %s found."
-                        % (
-                            (dt.now()).strftime("%c"),
-                            (self._dbusMon.dbusmon.get_value(service, "/ProductName")),
-                        )
-                    )
-        except Exception:
-            pass
-
-        if self._multi is not None:
-            if settings.NR_OF_MPPTS > 0:
-                self._searchTrials = 0
-                GLib.timeout_add(
-                    1000, self._find_mppts
-                )  # search MPPTs on DBus if present
-            else:
-                self._timeOld = tt.time()
-                GLib.timeout_add(
-                    1000, self._update
-                )  # if no MPPTs start the _update loop
-            return False  # all OK, stop calling this function
-        elif self._searchTrials < settings.SEARCH_TRIALS:
-            self._searchTrials += 1
-            return True  # next trial
-        else:
-            logging.error(
-                "%s: Multi/Quattro not found. Exiting." % (dt.now()).strftime("%c")
+        if len(settings.MULTI_KEY_WORD) > 0:
+            logging.info(
+                "%s: Searching Multi/Quattro VEbus: Trial Nr. %d"
+                % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
             )
-            sys.exit()
+            try:
+                for service in self._dbusConn.list_names():
+                    if settings.MULTI_KEY_WORD in service:
+                        self._multi = service
+                        logging.info(
+                            "%s: %s found."
+                            % (
+                                (dt.now()).strftime("%c"),
+                                (self._dbusMon.dbusmon.get_value(service, "/ProductName")),
+                            )
+                        )
+            except Exception:
+                pass
+
+            if self._multi is None:
+                if self._searchTrials < settings.SEARCH_TRIALS:
+                    self._searchTrials += 1
+                    return True  # next trial
+                else:
+                    logging.error(
+                        "%s: Multi/Quattro not found. Exiting." % (dt.now()).strftime("%c")
+                    )
+                    sys.exit()
+
+        if settings.NR_OF_MPPTS > 0:
+            self._searchTrials = 0
+            GLib.timeout_add(
+                1000, self._find_mppts
+            )  # search MPPTs on DBus if present
+        else:
+            self._timeOld = tt.time()
+            GLib.timeout_add(
+                1000, self._update
+            )  # if no MPPTs start the _update loop
+        return False  # all OK, stop calling this function
+
 
     # ############################################################
     # ############################################################
@@ -962,20 +965,22 @@ class DbusAggBatService(object):
         if settings.CURRENT_FROM_VICTRON:
             Current_VE = 0
             try:
-                Multi_Connected = self._dbusMon.dbusmon.get_value(
-                    self._multi, "/Connected"
-                )
-                if Multi_Connected > 0:
-                    Current_VE = self._dbusMon.dbusmon.get_value(
-                        self._multi, "/Dc/0/Current"
-                    )  # get DC current of multi/quattro (or system of them)
-                    if not self._multi_connected:
-                        logging.info("Multi/Quattro is connected.")
-                    self._multi_connected = True
-                else:
-                    if self._multi_connected:
-                        logging.info("Multi/Quattro is not connected.")
-                    self._multi_connected = False
+                if self._multi is not None:
+                    Multi_Connected = self._dbusMon.dbusmon.get_value(
+                        self._multi, "/Connected"
+                    )
+                    if Multi_Connected > 0:
+                        Current_VE = self._dbusMon.dbusmon.get_value(
+                            self._multi, "/Dc/0/Current"
+                        )  # get DC current of multi/quattro (or system of them)
+                        if not self._multi_connected:
+                            logging.info("Multi/Quattro is connected.")
+                        self._multi_connected = True
+                    else:
+                        if self._multi_connected:
+                            logging.info("Multi/Quattro is not connected.")
+                        self._multi_connected = False
+
                 for i in range(settings.NR_OF_MPPTS):
                     Current_VE += self._dbusMon.dbusmon.get_value(
                         self._mppts_list[i], "/Dc/0/Current"
