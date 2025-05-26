@@ -4,13 +4,13 @@
 
 # Nr. of physical batteries to be aggregated. Smart shunt for battery current is not needed and not supported.
 NR_OF_BATTERIES = 2
-NR_OF_CELLS_PER_BATTERY = 24
+NR_OF_CELLS_PER_BATTERY = 4
 
 # Nr. of MPPTs
-NR_OF_MPPTS = 1
+NR_OF_MPPTS = 0
 
 # If DC loads with Smart Shunt present, can be used for total current measurement.
-DC_LOADS = False
+DC_LOADS = True
 
 # False: Current subtracted, True: Current added
 INVERT_SMARTSHUNT = False
@@ -27,13 +27,13 @@ BATTERY_PRODUCT_NAME_PATH = "/ProductName"
 
 # Key world to identify the batteries (to exclude SmartShunt). If the BATTERY_PRODUCT_NAME_PATH, e.g. SerialBattery(Jkbms),
 # contains this key word, the device will be identified and included into the battery list. 
-BATTERY_PRODUCT_NAME = "SerialBattery"
+BATTERY_PRODUCT_NAME = "SerialBattery(Daly CAN)"
 
 # The name stored in the here selected BATTERY_INSTANCE_NAME_PATH will be taken as the name of the battery in the list.
 # Each battery instance should have an unique name. If not, a number will be added. You can choose: "/CustomName"
 # (set up in the serial battery driver and is lost on restart of the serial battery driver) or "/Serial"
 # (set up in the BMS and therefore not volatile).
-BATTERY_INSTANCE_NAME_PATH = "/Serial"
+BATTERY_INSTANCE_NAME_PATH = "/CustomName"
 
 # Key world to identify service of Multis/Quattros (or cluster of them).  You don't need to change it.
 MULTI_KEY_WORD = "com.victronenergy.vebus"
@@ -65,7 +65,7 @@ CURRENT_FROM_VICTRON = True
 OWN_SOC = True
 
 # Allow zeroing program's own charge counter at MIN_CELL_VOLTAGE. At full battery it is always set to 100%.
-ZERO_SOC = False
+ZERO_SOC = True
 
 # When the battery charge changes more than CHARGE_SAVE_PRECISION, the "charge" file is updated.
 # It is a trade-off between resolution and file access frequency. The value is relative.
@@ -83,38 +83,38 @@ CHARGE_SAVE_PRECISION = 0.0025
 # If True, the charge/discharge control parameters (CVL - Charge Voltage Limit, CCL - Charge Current Limit,
 # DCL - Discharge Current Limit) are calculated by this program.
 # If False, the parameters from Serial Battery instances are taken and aggregated.
-OWN_CHARGE_PARAMETERS = True
+OWN_CHARGE_PARAMETERS = False
 
 # This voltage per cell will be set periodically, once BALANCING_REPETITION days and kept until balancing
 # goal is reached (cell voltage difference <= CELL_DIFF_MAX) and the next charge cycle begins.
 # In case of heavy disbalance this condition can last several days.
-BALANCING_VOLTAGE = 2.5
-BALANCING_REPETITION = 10
+BALANCING_VOLTAGE = 3.50
+BALANCING_REPETITION = 6
 
 # Set up how full the battery has to be charged in given month. Set lower values in summer
 # to prolong battery life and higher values in winter to have more energy available.
 CHARGE_VOLTAGE_LIST = [
-    2.5,  # January
-    2.45,  # February
-    2.45,  # March
-    2.40,  # April
-    2.35,  # May
-    2.30,  # June
-    2.30,  # July
-    2.35,  # August
-    2.40,  # September
-    2.45,  # October
-    2.45,  # November
-    2.5,  # December
+    3.35,  # January
+    3.35,  # February
+    3.35,  # March
+    3.35,  # April
+    3.35,  # May
+    3.35,  # June
+    3.35,  # July
+    3.35,  # August
+    3.35,  # September
+    3.35,  # October
+    3.35,  # November
+    3.35,  # December
 ]
 
 # This is a cell-full protection feature. If MAX_CELL_VOLTAGE is reached by at least one cell,
 # the CVL is dynamically limited to avoid over-charging and triggering the BMS disconnection.
 # DC-coupled PV feed-in will be disabled to enable the CCL.
-MAX_CELL_VOLTAGE = 2.55
+MAX_CELL_VOLTAGE = 3.65
 
 # This is a cell-empty protection feature. If reached, discharge current is set to zero
-MIN_CELL_VOLTAGE = 1.9
+MIN_CELL_VOLTAGE = 2.8
 
 # Allows discharge again above MIN_CELL_VOLTAGE + MIN_CELL_HYSTERESIS
 MIN_CELL_HYSTERESIS = 0.3
@@ -122,16 +122,16 @@ MIN_CELL_HYSTERESIS = 0.3
 # Cell balancing (with BALANCING_VOLTAGE) goal in volts. When reached, the charging voltage limit per cell is reduced
 # from BALANCING_VOLTAGE down to CHARGE_VOLTAGE from the CHARGE_VOLTAGE_LIST. If due to heavy disbalance the dynamic CVL
 #  was activated and DC-coupled PV feed-in was de-activated, these measures are finished when the balancing goal is reached.
-CELL_DIFF_MAX = 0.025
+CELL_DIFF_MAX = 0.020
 
 # Charge fed into batteries is multiplied by efficiency in order to consider losses and enhance SoC counter precision.
 BATTERY_EFFICIENCY = 0.985
 
 # Max. total charge current at normal conditions
-MAX_CHARGE_CURRENT = 200
+MAX_CHARGE_CURRENT = 120
 
 # Max. total discharge current at normal conditions
-MAX_DISCHARGE_CURRENT = 200
+MAX_DISCHARGE_CURRENT = 400
 
 # Settings limiting charge current when at least one cell is getting full or empty. The lists may have any length,
 # but the length must be same for voltage and current. Linear interpolation is used for values between. 
@@ -158,14 +158,14 @@ CELL_DISCHARGE_LIMITED_CURRENT = [0, 0.05, 1]
 # than the minimum of all is taken. Attention: By using this function you rely on the functionality
 # and correct settings of the SerialBattery driver. Set "True" only if you know exactly
 # what you are doing. If not sure, keep it at "False".
-KEEP_MAX_CVL = False
+KEEP_MAX_CVL = True
 
 # ######################################
 # ###### Logging and reporting #########
 # ######################################
 
 # 0: Disable Cell Info on dbus, 1: Format: /Cell/BatteryName_Cell<ID>
-SEND_CELL_VOLTAGES = 0
+SEND_CELL_VOLTAGES = 1
 
 # 0: no logging, 1: print to console, 2: print to file
 LOGGING = 2
