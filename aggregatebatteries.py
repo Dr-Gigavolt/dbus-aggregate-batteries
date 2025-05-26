@@ -456,11 +456,11 @@ class DbusAggBatService(object):
             logging.info(
                 "%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount)
             )
-        if self._ownCharge < 0:
-            self._ownCharge = Soc
-            Soc /= InstalledCapacity
 
         if batteriesCount == settings.NR_OF_BATTERIES:
+            if self._ownCharge < 0:
+                self._ownCharge = Soc
+                Soc /= InstalledCapacity
             if settings.CURRENT_FROM_VICTRON:
                 self._searchTrials = 0
                 GLib.timeout_add(
