@@ -329,9 +329,14 @@ class DbusAggBatService(object):
         self._batteries_dict = {}  # Marvo2011
         self._smartShunt_list = []
         batteriesCount = 0
-        if self._ownCharge < 0:
-            Soc = 0
-            InstalledCapacity = 0
+        Soc = 0
+        InstalledCapacity = 0
+        smartShuntCount = 0
+        use_multiple_smartshunts = False
+        if isinstance(settings.MULTIPLE_SMARTSHUNTS, bool):
+            use_multiple_smartshunts = settings.MULTIPLE_SMARTSHUNTS
+        elif isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)):
+            use_multiple_smartshunts = (len(settings.MULTIPLE_SMARTSHUNTS) > 0)
         productName = ""
         customName = ""
         logging.info(
@@ -426,9 +431,20 @@ class DbusAggBatService(object):
                     elif (
                         (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
                     ):  # if SmartShunt found, can be used for DC load current
-                        if (len(self._smartShunt_list) == 0) or settings.CURRENT_FROM_SMARTSHUNT:
-                            self._smartShunt_list.append(service)
-                        logging.info("%s: Correct Smart Shunt product name %s (%s) found in the service %s" % ((dt.now()).strftime("%c"), productName, customName, service))
+                        smartShuntCount += 1
+                        logging.info("%s: Found Smart Shunt #%d, product name %s (%s) found in the service %s" % ((dt.now()).strftime("%c"), smartShuntCount, productName, customName, service))
+                        if use_multiple_smartshunts:
+                            include_shunt = True
+                            if isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)):
+                                include_shunt = (smartShuntCount in settings.MULTIPLE_SMARTSHUNTS)
+                            if include_shunt:
+                                self._smartShunt_list.append(service)
+                                logging.info("%s: Adding Smart Shunt #%d (%s) to DC Load" % ((dt.now()).strftime("%c"), smartShuntCount, customName))
+                        else:
+                            if (len(self._smartShunt_list) == 0):
+                                self._smartShunt_list.append(service)
+                            self._smartShunt_list[0] = service # make sure last SmartShunt is used to stick to original behavior
+                            logging.info("%s: Now only using Smart Shunt #%d (%s) as DC Load" % ((dt.now()).strftime("%c"), smartShuntCount, customName))
 
         except Exception:
             pass

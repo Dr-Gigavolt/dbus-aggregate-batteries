@@ -59,12 +59,14 @@ READ_TRIALS = 10
 # The Victron current measurement is very precise, therefore SmartShunt is not needed and not supported.
 CURRENT_FROM_VICTRON = True
 
-# If True and CURRENT_VICTRON is True, add the battery current from all found SmartShunts and use instead of the BMS
-# This is implemented as e.g. Daly BMS shows no DC current below a certain threshold, so slow discharge cannot be monitored otherwise
-CURRENT_FROM_SMARTSHUNT = True
+# Use multiple SmartShunts and control which ones
+# - False or an empty list is the original default behavior of using the last SmartShunt instance
+# - True uses all available SmartShunts
+# - a list of numbers allows using only certain SmartShunts, the numbers are in order of SmartShunt occurence as listed in dbus-spy or log file
+MULTIPLE_SMARTSHUNTS = False
 
 # Threshold below which to use sum of currents from SmartShunts as battery current
-# if number is <= 0 then SmartShunt current aggregrate is always used
+# if SMARTSHUNT_CURRENT_THRESHOLD is <= 0 then the SmartShunt current aggregrate is always used
 SMARTSHUNT_CURRENT_THRESHOLD = -1
 
 # If True, the program's own charge counter is used instead of the BMS counters.
