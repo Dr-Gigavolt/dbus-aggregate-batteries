@@ -53,7 +53,7 @@ class DbusAggBatService(object):
         self._batteries_dict = {}  # marvo2011
         self._multi = None
         self._mppts_list = []
-        self._smartShunt = None
+        self._smartShunt_list = []
         self._searchTrials = 0
         self._readTrials = 0
         self._MaxChargeVoltage_old = 0
@@ -317,16 +317,17 @@ class DbusAggBatService(object):
             )
             sys.exit()
 
-    # ####################################################################
-    # ####################################################################
-    # ## search physical batteries and optional SmartShunt on DC loads ###
-    # ####################################################################
-    # ####################################################################
+    # #####################################################################
+    # #####################################################################
+    # ## search physical batteries and optional SmartShunts on DC loads ###
+    # #####################################################################
+    # #####################################################################
 
     def _find_batteries(self):
         self._batteries_dict = {}  # Marvo2011
         batteriesCount = 0
         productName = ""
+        customName = ""
         logging.info(
             "%s: Searching batteries: Trial Nr. %d"
             % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
@@ -338,6 +339,9 @@ class DbusAggBatService(object):
                 if settings.BATTERY_SERVICE_NAME in service:
                     productName = self._dbusMon.dbusmon.get_value(
                         service, settings.BATTERY_PRODUCT_NAME_PATH
+                    )
+                    customName  = self._dbusMon.dbusmon.get_value(
+                        service, "/CustomName"
                     )
                     if (productName != None) and (settings.BATTERY_PRODUCT_NAME in productName):
                         logging.info("%s: Correct battery product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
@@ -403,8 +407,9 @@ class DbusAggBatService(object):
                     elif (
                         (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
                     ):  # if SmartShunt found, can be used for DC load current
-                        self._smartShunt = service
-                        logging.info("%s: Correct Smart Shunt product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
+                        if (len(self._smartShunt_list) == 0) || settings.CURRENT_FROM_SMARTSHUNT:
+                            self._smartShunt_list.append(service)
+                        logging.info("%s: Correct Smart Shunt product name %s (%s) found in the service %s" % ((dt.now()).strftime("%c"), productName, customName, service))
 
         except Exception:
             pass
@@ -922,14 +927,20 @@ class DbusAggBatService(object):
                     )  # add DC current of all MPPTs (if present)
 
                 if settings.DC_LOADS:
-                    if settings.INVERT_SMARTSHUNT:
-                        Current_VE += self._dbusMon.dbusmon.get_value(
-                            self._smartShunt, "/Dc/0/Current"
-                        )  # SmartShunt is monitored as a battery
-                    else:
-                        Current_VE -= self._dbusMon.dbusmon.get_value(
-                            self._smartShunt, "/Dc/0/Current"
-                        )
+                    Current_SHUNT = 0
+                    use_shunt_aggregate = false
+                    for i in range(len(self._smartShunt_list)):
+                            shunt_current = self._dbusMon.dbusmon.get_value(
+                                self._smartShunt_list[i], "/Dc/0/Current"
+                            )  # SmartShunt is monitored as a battery
+                            Current_SHUNT += shunt_current
+                            if (abs(shunt_current) < settings.SMARTSHUNT_CURRENT_THRESHOLD) || (settings.SMARTSHUNT_CURRENT_THRESHOLD < 0):
+                                use_shunt_aggregate = True # use SmartShunt aggregate if at least one is below the threshold
+                    if use_shunt_aggregate:
+                        if settings.INVERT_SMARTSHUNT:
+                            Current_VE += Current_SHUNT
+                        else:
+                            Current_VE -= Current_SHUNT
 
                 if Current_VE is not None:
                     Current = Current_VE  # BMS current overwritten only if no exception raised

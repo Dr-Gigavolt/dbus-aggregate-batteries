@@ -59,6 +59,14 @@ READ_TRIALS = 10
 # The Victron current measurement is very precise, therefore SmartShunt is not needed and not supported.
 CURRENT_FROM_VICTRON = True
 
+# If True and CURRENT_VICTRON is True, add the battery current from all found SmartShunts and use instead of the BMS
+# This is implemented as e.g. Daly BMS shows no DC current below a certain threshold, so slow discharge cannot be monitored otherwise
+CURRENT_FROM_SMARTSHUNT = True
+
+# Threshold below which to use sum of currents from SmartShunts as battery current
+# if number is <= 0 then SmartShunt current aggregrate is always used
+SMARTSHUNT_CURRENT_THRESHOLD = 1.5
+
 # If True, the program's own charge counter is used instead of the BMS counters.
 # Necessary for JK BMS due to poor current measurement precision
 # and not implemented 100% and 0% reset except of case of MOSFET disconnection.
