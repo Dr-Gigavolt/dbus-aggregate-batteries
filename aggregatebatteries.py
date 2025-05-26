@@ -387,7 +387,7 @@ class DbusAggBatService(object):
                             InstalledCapacity += battery_capacity
                             Soc += battery_soc
                             logging.info(
-                                "%s SoC: %f / %f Ah" % (BatteryName, battery_soc, battery_capacity)
+                                "%s SoC: %f / %f Ah" % (BatteryName, battery_soc / 100.0, battery_capacity)
                             )
 
                         # Create voltage paths with battery names
@@ -431,9 +431,14 @@ class DbusAggBatService(object):
 
         except Exception:
             pass
-        logging.info(
-            "%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount)
-        )
+        if len(self._smartShunt_list) > 0:
+            logging.info(
+                "%s: %d batteries and %d SmartShunts found." % ((dt.now()).strftime("%c"), batteriesCount, len(self._smartShunt_list))
+            )
+        else:
+            logging.info(
+                "%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount)
+            )
         if self._ownCharge < 0:
             self._ownCharge = Soc
             Soc /= InstalledCapacity
@@ -944,7 +949,7 @@ class DbusAggBatService(object):
                     self._multi, "/Connected"
                 )
                 if Multi_Connected > 0:
-                    Current_VE += self._dbusMon.dbusmon.get_value(
+                    Current_VE = self._dbusMon.dbusmon.get_value(
                         self._multi, "/Dc/0/Current"
                     )  # get DC current of multi/quattro (or system of them)
                     if not self._multi_connected:
