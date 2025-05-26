@@ -97,7 +97,11 @@ class DbusMon:
                 "/Info/MaxChargeVoltage": dummy,
                 "/Info/ChargeMode": dummy,
             },
-            "com.victronenergy.vebus": {"/Dc/0/Current": dummy, "/ProductName": dummy},
+            "com.victronenergy.vebus": {
+                "/Connected": dummy,
+                "/Dc/0/Current": dummy,
+                "/ProductName": dummy
+            },
             "com.victronenergy.solarcharger": {
                 "/Dc/0/Current": dummy,
                 "/ProductName": dummy,

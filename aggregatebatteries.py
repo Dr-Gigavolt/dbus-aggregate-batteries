@@ -378,10 +378,10 @@ class DbusAggBatService(object):
                         # accumulate capacities and Soc if not read from charge file
                         if self._ownCharge < 0:
                             battery_capacity = self._dbusMon.dbusmon.get_value(
-                                self._batteries_dict[i], "/InstalledCapacity"
+                                self._batteries_dict[BatteryName], "/InstalledCapacity"
                             )
                             battery_soc = self._dbusMon.dbusmon.get_value(
-                                self._batteries_dict[i], "/Soc"
+                                self._batteries_dict[BatteryName], "/Soc"
                             ) * battery_capacity
                             InstalledCapacity += battery_capacity
                             Soc += battery_soc
