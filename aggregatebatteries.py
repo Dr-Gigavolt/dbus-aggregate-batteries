@@ -950,8 +950,8 @@ class DbusAggBatService(object):
                     )  # get DC current of multi/quattro (or system of them)
                     if not self._multi_connected:
                         logging.info("Multi/Quattro is connected.")
-                    self._multi_connected = True 
-               else:
+                    self._multi_connected = True
+                else:
                     if self._multi_connected:
                         logging.info("Multi/Quattro is not connected.")
                     self._multi_connected = False
