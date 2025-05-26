@@ -325,7 +325,11 @@ class DbusAggBatService(object):
 
     def _find_batteries(self):
         self._batteries_dict = {}  # Marvo2011
+        if self._ownCharge < 0:
+            self._ownCharge = 0
         batteriesCount = 0
+        Soc = 0
+        InstalledCapacity = 0
         productName = ""
         customName = ""
         logging.info(
@@ -371,6 +375,16 @@ class DbusAggBatService(object):
                         )
 
                         batteriesCount += 1
+                        # accumulate capacities and Soc if not read from charge file
+                        if self._ownCharge < 0:
+                            battery_capacity = self._dbusMon.dbusmon.get_value(
+                                self._batteries_dict[i], "/InstalledCapacity"
+                            )
+                            battery_soc = self._dbusMon.dbusmon.get_value(
+                                self._batteries_dict[i], "/Soc"
+                            ) * battery_capacity
+                            InstalledCapacity += battery_capacity
+                            Soc += battery_soc
 
                         # Create voltage paths with battery names
                         if settings.SEND_CELL_VOLTAGES == 1:
@@ -416,6 +430,9 @@ class DbusAggBatService(object):
         logging.info(
             "%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount)
         )
+        if self._ownCharge < 0:
+            self._ownCharge = Soc
+            Soc /= InstalledCapacity
 
         if batteriesCount == settings.NR_OF_BATTERIES:
             if settings.CURRENT_FROM_VICTRON:
