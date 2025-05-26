@@ -327,8 +327,7 @@ class DbusAggBatService(object):
 
     def _find_batteries(self):
         self._batteries_dict = {}  # Marvo2011
-        if self._ownCharge < 0:
-            self._ownCharge = 0
+        self._smartShunt_list = []
         batteriesCount = 0
         Soc = 0
         InstalledCapacity = 0
