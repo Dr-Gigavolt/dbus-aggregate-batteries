@@ -59,6 +59,8 @@ class DbusAggBatService(object):
         self._MaxChargeVoltage_old = 0
         self._MaxChargeCurrent_old = 0
         self._MaxDischargeCurrent_old = 0
+        # Multi/Quattro connection/disconnection info output only once
+        self._multi_connected = True
         # implementing hysteresis for allowing discharge
         self._fullyDischarged = False
         self._dbusConn = get_bus()
@@ -370,7 +372,7 @@ class DbusAggBatService(object):
                                         service, "/ProductName"
                                     )
                                 ),
-                                BatteryName,
+                                BatteryName
                             )
                         )
 
@@ -378,13 +380,16 @@ class DbusAggBatService(object):
                         # accumulate capacities and Soc if not read from charge file
                         if self._ownCharge < 0:
                             battery_capacity = self._dbusMon.dbusmon.get_value(
-                                self._batteries_dict[BatteryName], "/InstalledCapacity"
+                                service, "/InstalledCapacity"
                             )
                             battery_soc = self._dbusMon.dbusmon.get_value(
-                                self._batteries_dict[BatteryName], "/Soc"
+                                service, "/Soc"
                             ) * battery_capacity
                             InstalledCapacity += battery_capacity
                             Soc += battery_soc
+                            logging.info(
+                                "%s SoC: %f / %f Ah" % (BatteryName, battery_soc, battery_capacity)
+                            )
 
                         # Create voltage paths with battery names
                         if settings.SEND_CELL_VOLTAGES == 1:
@@ -464,7 +469,7 @@ class DbusAggBatService(object):
 
     def _find_multis(self):
         logging.info(
-            "%s: Searching Multi/Quatro VEbus: Trial Nr. %d"
+            "%s: Searching Multi/Quattro VEbus: Trial Nr. %d"
             % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
         )
         try:
@@ -943,6 +948,13 @@ class DbusAggBatService(object):
                     Current_VE += self._dbusMon.dbusmon.get_value(
                         self._multi, "/Dc/0/Current"
                     )  # get DC current of multi/quattro (or system of them)
+                    if not self._multi_connected:
+                        logging.info("Multi/Quattro is connected.")
+                    self._multi_connected = True 
+               else:
+                    if self._multi_connected:
+                        logging.info("Multi/Quattro is not connected.")
+                    self._multi_connected = False
                 for i in range(settings.NR_OF_MPPTS):
                     Current_VE += self._dbusMon.dbusmon.get_value(
                         self._mppts_list[i], "/Dc/0/Current"
