@@ -59,6 +59,16 @@ READ_TRIALS = 10
 # The Victron current measurement is very precise, therefore SmartShunt is not needed and not supported.
 CURRENT_FROM_VICTRON = True
 
+# Use multiple SmartShunts and control which ones
+# - False or an empty list is the original default behavior of using the last SmartShunt instance
+# - True uses all available SmartShunts
+# - a list of numbers allows using only certain SmartShunts, the numbers are in order of SmartShunt occurence as listed in dbus-spy or log file
+MULTIPLE_SMARTSHUNTS = False
+
+# Threshold below which to use sum of currents from SmartShunts as battery current
+# if SMARTSHUNT_CURRENT_THRESHOLD is <= 0 then the SmartShunt current aggregrate is always used
+SMARTSHUNT_CURRENT_THRESHOLD = -1
+
 # If True, the program's own charge counter is used instead of the BMS counters.
 # Necessary for JK BMS due to poor current measurement precision
 # and not implemented 100% and 0% reset except of case of MOSFET disconnection.
