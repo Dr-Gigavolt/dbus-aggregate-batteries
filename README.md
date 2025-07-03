@@ -1,4 +1,4 @@
-## Version 3.5.20250516
+## Version 3.5.20250703
 
 Attention: This is my first experience with the Victron system. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in `settings.py`. I extended the description after some users misunderstood it. Please execute command dbus-spy on your Venus OS and review all paths transmitted by Serial Battery instances.
 
@@ -52,7 +52,11 @@ On starts, the program searches for DBus services:
 The data from DBus are collected, processed and the results are sent back to DBus once per second.
 Dbus monitor defined in dbusmon.py is used instead of VeDbusItemImport which was very resources hungry (since V2.0). I strongly recommend to everyone modifying the code to keep this technique.
 
-If you wish to combine the charger control parameters (`CVL - Charge Voltage Limit`, `CCL - Charge Current Limit`, `DCL - Discharge Current Limit`) provided by all instances of SerialBattery, please set `OWN_CHARGE_PARAMETERS = False`. If `OWN_CHARGE_PARAMETERS = True`, the charging and discharging is controlled by the AggregateBatteries.
+If you wish to combine the charger control parameters (`CVL - Charge Voltage Limit`, `CCL - Charge Current Limit`, `DCL - Discharge Current Limit`) provided by all instances of SerialBattery, please set `OWN_CHARGE_PARAMETERS = False`.
+
+If `OWN_CHARGE_PARAMETERS = True`, the charging and discharging is controlled by the AggregateBatteries.
+In combination with `OWN_CHARGE_PARAMETERS = False` you need to set up the charge counter resetting values `MAX_CELL_VOLTAGE_SOC_FULL` and `MIN_CELL_VOLTAGE_SOC_EMPTY`
+
 
 In contrary to SerialBattery driver, I don't use the Bulk-Absorption-Float lead-acid-like algorithm. The LTO cells used by me are very robust and don't suffer at full charge voltage for longer period of time. Of course you shouldn't keep them above `2.5V`, although max. voltage according datasheet is `2.8V`. In case of constant voltage charging they are full at about `2.45V ... 2.5V`. But the most of you use LFP cells, therefore I use another approach. For LFP you have to set up the cell voltages according your experience or literature.
 
