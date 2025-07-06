@@ -331,14 +331,18 @@ class DbusAggBatService(object):
         batteriesCount = 0
         Soc = 0
         InstalledCapacity = 0
-        smartShuntCount = 0
         use_multiple_smartshunts = False
+        included_smartshunts = []
+        NR_OF_SMARTSHUNTS = 0 # need to find >= 0 NR_OF_SMARTSHUNTS
         if isinstance(settings.MULTIPLE_SMARTSHUNTS, bool):
             use_multiple_smartshunts = settings.MULTIPLE_SMARTSHUNTS
         elif isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)):
             use_multiple_smartshunts = (len(settings.MULTIPLE_SMARTSHUNTS) > 0)
+            if use_multiple_smartshunts:
+                NR_SMARTSHUNTS = len(settings.MULTIPLE_SMARTSHUNTS)
+            included_smartshunts = [False] * NR_SMARTSHUNTS
         productName = ""
-        customName = ""
+        shuntName = ""
         logging.info(
             "%s: Searching batteries: Trial Nr. %d"
             % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
@@ -351,8 +355,8 @@ class DbusAggBatService(object):
                     productName = self._dbusMon.dbusmon.get_value(
                         service, settings.BATTERY_PRODUCT_NAME_PATH
                     )
-                    customName  = self._dbusMon.dbusmon.get_value(
-                        service, "/CustomName"
+                    shuntName  = self._dbusMon.dbusmon.get_value(
+                        service, settings.SMARTSHUNT_INSTANCE_NAME_PATH
                     )
                     if (productName != None) and (settings.BATTERY_PRODUCT_NAME in productName):
                         logging.info("%s: Correct battery product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
@@ -431,33 +435,62 @@ class DbusAggBatService(object):
                     elif (
                         (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
                     ):  # if SmartShunt found, can be used for DC load current
-                        smartShuntCount += 1
-                        logging.info("%s: Found Smart Shunt #%d, product name %s (%s), in the service %s" % ((dt.now()).strftime("%c"), smartShuntCount, productName, customName, service))
+                        shunt_vrm_id = self._dbusMon.dbusmon.get_value(
+                             service, "/DeviceInstance"
+                        )
+                        logging.info(
+                            "%s: Correct SmartShunt product name %s found in the service %s"
+                            % ((dt.now()).strftime("%c"), productName, service)
+                        )
                         if use_multiple_smartshunts:
                             include_shunt = True
                             if isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)):
-                                include_shunt = (smartShuntCount in settings.MULTIPLE_SMARTSHUNTS)
+                                for shunt_id in range(0, len(settings.MULTIPLE_SMARTSHUNTS)):
+                                    if included_smartshunts[shunt_id]: # already included, move along
+                                        continue
+                                    if isinstance(settings.MULTIPLE_SMARTSHUNTS[shunt_id], int): 
+                                        include_shunt = (settings.MULTIPLE_SMARTSHUNTS[shunt_id] == shunt_vrm_id)
+                                    elif isinstance(settings.MULTIPLE_SMARTSHUNTS[shunt_id], str):
+                                        include_shunt = (settings.MULTIPLE_SMARTSHUNTS[shunt_id] == shuntName)
+                                    else:
+                                        logging.error(
+                                            "%s: Bad element #%d in \"%s\" in MULTIPLE_SMARTSHUNTS list. Entries need to be VRM instance numbers or Name strings. Exiting."
+                                            % (dt.now()).strftime("%c"), shunt_id+1, settings.MULTIPLE_SMARTSHUNTS[shunt_id]
+                                        )
+                                        sys.exit()
+                                    if include_shunt:
+                                        break
                             if include_shunt:
                                 self._smartShunt_list.append(service)
-                                logging.info("%s: Adding Smart Shunt #%d (%s) to monitor DC Load" % ((dt.now()).strftime("%c"), smartShuntCount, customName))
+                                logging.info(
+                                    "%s: %s [%d] added, named as: %s."
+                                    % ((dt.now()).strftime("%c"), productName, shunt_vrm_id, shuntName)
+                                )
                         else:
                             if (len(self._smartShunt_list) == 0):
                                 self._smartShunt_list.append(service)
                             self._smartShunt_list[0] = service # make sure last SmartShunt is used to stick to original behavior
-                            logging.info("%s: Now only using Smart Shunt #%d (%s) to monitor DC Load" % ((dt.now()).strftime("%c"), smartShuntCount, customName))
+                            logging.info(
+                                "%s: %s [%d] is now used, named as: %s."
+                                % ((dt.now()).strftime("%c"), productName, shunt_vrm_id, shuntName)
+                            )
 
         except Exception:
             pass
         if len(self._smartShunt_list) > 0:
             logging.info(
-                "%s: %d batteries and %d SmartShunts (using %d) found." % ((dt.now()).strftime("%c"), batteriesCount, len(self._smartShunt_list), smartShuntCount)
+                "%s: %d batteries and %d SmartShunts found."
+                % ((dt.now()).strftime("%c"), batteriesCount, len(self._smartShunt_list))
             )
         else:
             logging.info(
                 "%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount)
             )
 
-        if batteriesCount == settings.NR_OF_BATTERIES:
+        if (
+            (batteriesCount == settings.NR_OF_BATTERIES) and
+            (len(self._smartShunt_list) >= NR_OF_SMARTSHUNTS)
+           ):
             if self._ownCharge < 0:
                 self._ownCharge = Soc
                 Soc /= InstalledCapacity
@@ -476,10 +509,16 @@ class DbusAggBatService(object):
             self._searchTrials += 1
             return True  # next trial
         else:
-            logging.error(
-                "%s: Required number of batteries not found. Exiting."
-                % (dt.now()).strftime("%c")
-            )
+            if (NR_OF_SMARTSHUNTS > 0):
+                logging.error(
+                    "%s: Required number of batteries (%d) or SmartShunts (%d) not found. Exiting."
+                    % (dt.now()).strftime("%c"), settings.NR_OF_BATTERIES, NR_OF_SMARTSHUNTS
+                )
+            else:
+                logging.error(
+                    "%s: Required number of batteries not found. Exiting."
+                    % (dt.now()).strftime("%c")
+                )
             sys.exit()
 
     # #########################################################################

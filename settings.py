@@ -2,7 +2,7 @@
 # ######## Hardware settings ###########
 # ######################################
 
-# Nr. of physical batteries to be aggregated. Smart shunt for battery current is not needed and not supported.
+# Nr. of physical batteries to be aggregated.
 NR_OF_BATTERIES = 2
 NR_OF_CELLS_PER_BATTERY = 24
 
@@ -41,8 +41,12 @@ MULTI_KEY_WORD = "com.victronenergy.vebus"
 # Key world to identify services of solar chargers. You don't need to change it.
 MPPT_KEY_WORD = "com.victronenergy.solarcharger"
 
-# Key world to identify services of SmartShunt, if you use it for current into DC loads. You don't need to change it.
+# Key word to identify services of SmartShunt, if you use it for current into DC loads. You don't need to change it.
 SMARTSHUNT_NAME_KEY_WORD = "SmartShunt"
+
+# When explicitly naming multiple SmartShunts (MULTIPLE_SMARTSHUNTS option below), use the names from this source
+# A good default is "/CustomName", it does not need to be changed.
+SMARTSHUNT_INSTANCE_NAME_PATH="/CustomName"
 
 # Trials to identify of all batteries before exit and restart.
 SEARCH_TRIALS = 10
@@ -62,7 +66,10 @@ CURRENT_FROM_VICTRON = True
 # Use multiple SmartShunts and control which ones
 # - False or an empty list is the original default behavior of using the last SmartShunt instance
 # - True uses all available SmartShunts
-# - a list of numbers allows using only certain SmartShunts, the numbers are in order of SmartShunt occurence as listed in dbus-spy or log file
+# - a list of VRM instance numbers allows using only certain SmartShunts, e.g. [278, 279] would chose VRM instances 278 and 279
+#   (the VRM instance numbers of the respective SmartShunts can be found in their "Device" page)
+# - a list of unique Smart Shunt names (custom name entry by default, specified with SMARTSHUNT_INSTANCE_NAME_PATH),
+#   e.g. ["FrontShunt", "MiddleShunt", "RearShunt"] would select the respective shunts to be included in the DC current calculation
 MULTIPLE_SMARTSHUNTS = False
 
 # Threshold below which to use sum of currents from SmartShunts as battery current
