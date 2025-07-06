@@ -84,6 +84,10 @@ OWN_SOC = True
 # Allow zeroing program's own charge counter at MIN_CELL_VOLTAGE. At full battery it is always set to 100%.
 ZERO_SOC = False
 
+# SoC resetting values if OWN_SOC = True and OWN_CHARGE_PARAMETERS = False
+MAX_CELL_VOLTAGE_SOC_FULL = 1.9
+MIN_CELL_VOLTAGE_SOC_EMPTY = 2.5
+
 # When the battery charge changes more than CHARGE_SAVE_PRECISION, the "charge" file is updated.
 # It is a trade-off between resolution and file access frequency. The value is relative.
 # The "charge" file is read on start of this program.
@@ -116,8 +120,8 @@ CHARGE_VOLTAGE_LIST = [
     2.45,  # March
     2.40,  # April
     2.35,  # May
-    2.30,  # June
-    2.30,  # July
+    2.35,  # June
+    2.35,  # July
     2.35,  # August
     2.40,  # September
     2.45,  # October
@@ -128,7 +132,7 @@ CHARGE_VOLTAGE_LIST = [
 # This is a cell-full protection feature. If MAX_CELL_VOLTAGE is reached by at least one cell,
 # the CVL is dynamically limited to avoid over-charging and triggering the BMS disconnection.
 # DC-coupled PV feed-in will be disabled to enable the CCL.
-MAX_CELL_VOLTAGE = 2.55
+MAX_CELL_VOLTAGE = 2.6
 
 # This is a cell-empty protection feature. If reached, discharge current is set to zero
 MIN_CELL_VOLTAGE = 1.9
@@ -142,7 +146,7 @@ MIN_CELL_HYSTERESIS = 0.3
 CELL_DIFF_MAX = 0.025
 
 # Charge fed into batteries is multiplied by efficiency in order to consider losses and enhance SoC counter precision.
-BATTERY_EFFICIENCY = 0.985
+BATTERY_EFFICIENCY = 0.98
 
 # Max. total charge current at normal conditions
 MAX_CHARGE_CURRENT = 200

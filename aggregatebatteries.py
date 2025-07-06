@@ -31,7 +31,7 @@ from threading import Thread
 sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "3.5.20250516"
+VERSION = "3.5.20250703"
 
 class SystemBus(dbus.bus.BusConnection):
     def __new__(cls):
@@ -979,7 +979,7 @@ class DbusAggBatService(object):
 
         # find max. charge voltage (if needed)
         if not settings.OWN_CHARGE_PARAMETERS:
-            if settings.KEEP_MAX_CVL and ("Float" in ChargeMode_list):
+            if settings.KEEP_MAX_CVL and any("Float" in item for item in ChargeMode_list):
                 MaxChargeVoltage = self._fn._max(MaxChargeVoltage_list)
                     
             else:
@@ -1227,7 +1227,15 @@ class DbusAggBatService(object):
                         MinCellVoltage,
                     )
                 )
-
+        
+        # SoC resetting if OWN_SOC = True and OWN_CHARGE_PARAMETERS = False
+        else:
+            if OWN_SOC:
+                if (MaxCellVoltage >= MAX_CELL_VOLTAGE_SOC_FULL):
+                    self._ownCharge = InstalledCapacity  # reset Coulumb counter to 100%
+                if (MinCellVoltage <= MIN_CELL_VOLTAGE_SOC_EMPTY) and ZERO_SOC:
+                    self._ownCharge = 0  # reset Coulumb counter to 0%
+        
         ###########################################################
         # own Coulomb counter (runs even the BMS values are used) #
         ###########################################################
