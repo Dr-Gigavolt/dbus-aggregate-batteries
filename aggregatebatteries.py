@@ -1230,10 +1230,10 @@ class DbusAggBatService(object):
         
         # SoC resetting if OWN_SOC = True and OWN_CHARGE_PARAMETERS = False
         else:
-            if OWN_SOC:
-                if (MaxCellVoltage >= MAX_CELL_VOLTAGE_SOC_FULL):
+            if settings.OWN_SOC:
+                if (MaxCellVoltage >= settings.MAX_CELL_VOLTAGE_SOC_FULL):
                     self._ownCharge = InstalledCapacity  # reset Coulumb counter to 100%
-                if (MinCellVoltage <= MIN_CELL_VOLTAGE_SOC_EMPTY) and ZERO_SOC:
+                if (MinCellVoltage <= settings.MIN_CELL_VOLTAGE_SOC_EMPTY) and ZERO_SOC:
                     self._ownCharge = 0  # reset Coulumb counter to 0%
         
         ###########################################################
