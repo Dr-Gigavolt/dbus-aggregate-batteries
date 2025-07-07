@@ -53,12 +53,14 @@ class DbusAggBatService(object):
         self._batteries_dict = {}  # marvo2011
         self._multi = None
         self._mppts_list = []
-        self._smartShunt = None
+        self._smartShunt_list = []
         self._searchTrials = 0
         self._readTrials = 0
         self._MaxChargeVoltage_old = 0
         self._MaxChargeCurrent_old = 0
         self._MaxDischargeCurrent_old = 0
+        # Multi/Quattro connection/disconnection info output only once
+        self._multi_connected = True
         # implementing hysteresis for allowing discharge
         self._fullyDischarged = False
         self._dbusConn = get_bus()
@@ -317,16 +319,30 @@ class DbusAggBatService(object):
             )
             sys.exit()
 
-    # ####################################################################
-    # ####################################################################
-    # ## search physical batteries and optional SmartShunt on DC loads ###
-    # ####################################################################
-    # ####################################################################
+    # #####################################################################
+    # #####################################################################
+    # ## search physical batteries and optional SmartShunts on DC loads ###
+    # #####################################################################
+    # #####################################################################
 
     def _find_batteries(self):
         self._batteries_dict = {}  # Marvo2011
+        self._smartShunt_list = []
         batteriesCount = 0
+        Soc = 0
+        InstalledCapacity = 0
+        use_multiple_smartshunts = False
+        included_smartshunts = []
+        NR_OF_SMARTSHUNTS = 0 # need to find >= 0 NR_OF_SMARTSHUNTS
+        if isinstance(settings.MULTIPLE_SMARTSHUNTS, bool):
+            use_multiple_smartshunts = settings.MULTIPLE_SMARTSHUNTS
+        elif isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)):
+            use_multiple_smartshunts = (len(settings.MULTIPLE_SMARTSHUNTS) > 0)
+            if use_multiple_smartshunts:
+                NR_SMARTSHUNTS = len(settings.MULTIPLE_SMARTSHUNTS)
+            included_smartshunts = [False] * NR_SMARTSHUNTS
         productName = ""
+        shuntName = ""
         logging.info(
             "%s: Searching batteries: Trial Nr. %d"
             % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
@@ -338,6 +354,9 @@ class DbusAggBatService(object):
                 if settings.BATTERY_SERVICE_NAME in service:
                     productName = self._dbusMon.dbusmon.get_value(
                         service, settings.BATTERY_PRODUCT_NAME_PATH
+                    )
+                    shuntName  = self._dbusMon.dbusmon.get_value(
+                        service, settings.SMARTSHUNT_INSTANCE_NAME_PATH
                     )
                     if (productName != None) and (settings.BATTERY_PRODUCT_NAME in productName):
                         logging.info("%s: Correct battery product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
@@ -362,11 +381,24 @@ class DbusAggBatService(object):
                                         service, "/ProductName"
                                     )
                                 ),
-                                BatteryName,
+                                BatteryName
                             )
                         )
 
                         batteriesCount += 1
+                        # accumulate capacities and Soc if not read from charge file
+                        if self._ownCharge < 0:
+                            battery_capacity = self._dbusMon.dbusmon.get_value(
+                                service, "/InstalledCapacity"
+                            )
+                            battery_soc = self._dbusMon.dbusmon.get_value(
+                                service, "/Soc"
+                            ) * battery_capacity
+                            InstalledCapacity += battery_capacity
+                            Soc += battery_soc
+                            logging.info(
+                                "%s SoC: %f / %f Ah" % (BatteryName, battery_soc / 100.0, battery_capacity)
+                            )
 
                         # Create voltage paths with battery names
                         if settings.SEND_CELL_VOLTAGES == 1:
@@ -403,16 +435,65 @@ class DbusAggBatService(object):
                     elif (
                         (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
                     ):  # if SmartShunt found, can be used for DC load current
-                        self._smartShunt = service
-                        logging.info("%s: Correct Smart Shunt product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
+                        shunt_vrm_id = self._dbusMon.dbusmon.get_value(
+                             service, "/DeviceInstance"
+                        )
+                        logging.info(
+                            "%s: Correct SmartShunt product name %s found in the service %s"
+                            % ((dt.now()).strftime("%c"), productName, service)
+                        )
+                        if use_multiple_smartshunts:
+                            include_shunt = True
+                            if isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)):
+                                for shunt_id in range(0, len(settings.MULTIPLE_SMARTSHUNTS)):
+                                    if included_smartshunts[shunt_id]: # already included, move along
+                                        continue
+                                    if isinstance(settings.MULTIPLE_SMARTSHUNTS[shunt_id], int): 
+                                        include_shunt = (settings.MULTIPLE_SMARTSHUNTS[shunt_id] == shunt_vrm_id)
+                                    elif isinstance(settings.MULTIPLE_SMARTSHUNTS[shunt_id], str):
+                                        include_shunt = (settings.MULTIPLE_SMARTSHUNTS[shunt_id] == shuntName)
+                                    else:
+                                        logging.error(
+                                            "%s: Bad element #%d in \"%s\" in MULTIPLE_SMARTSHUNTS list. Entries need to be VRM instance numbers or Name strings. Exiting."
+                                            % (dt.now()).strftime("%c"), shunt_id+1, settings.MULTIPLE_SMARTSHUNTS[shunt_id]
+                                        )
+                                        sys.exit()
+                                    if include_shunt:
+                                        break
+                            if include_shunt:
+                                self._smartShunt_list.append(service)
+                                logging.info(
+                                    "%s: %s [%d] added, named as: %s."
+                                    % ((dt.now()).strftime("%c"), productName, shunt_vrm_id, shuntName)
+                                )
+                        else:
+                            if (len(self._smartShunt_list) == 0):
+                                self._smartShunt_list.append(service)
+                            self._smartShunt_list[0] = service # make sure last SmartShunt is used to stick to original behavior
+                            logging.info(
+                                "%s: %s [%d] is now used, named as: %s."
+                                % ((dt.now()).strftime("%c"), productName, shunt_vrm_id, shuntName)
+                            )
 
         except Exception:
             pass
-        logging.info(
-            "%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount)
-        )
+        if len(self._smartShunt_list) > 0:
+            logging.info(
+                "%s: %d batteries and %d SmartShunts found."
+                % ((dt.now()).strftime("%c"), batteriesCount, len(self._smartShunt_list))
+            )
+        else:
+            logging.info(
+                "%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount)
+            )
 
-        if batteriesCount == settings.NR_OF_BATTERIES:
+        if (
+            (batteriesCount == settings.NR_OF_BATTERIES) and
+            (len(self._smartShunt_list) >= NR_OF_SMARTSHUNTS)
+           ):
+            if self._ownCharge < 0:
+                self._ownCharge = Soc
+                Soc /= InstalledCapacity
             if settings.CURRENT_FROM_VICTRON:
                 self._searchTrials = 0
                 GLib.timeout_add(
@@ -428,10 +509,16 @@ class DbusAggBatService(object):
             self._searchTrials += 1
             return True  # next trial
         else:
-            logging.error(
-                "%s: Required number of batteries not found. Exiting."
-                % (dt.now()).strftime("%c")
-            )
+            if (NR_OF_SMARTSHUNTS > 0):
+                logging.error(
+                    "%s: Required number of batteries (%d) or SmartShunts (%d) not found. Exiting."
+                    % (dt.now()).strftime("%c"), settings.NR_OF_BATTERIES, NR_OF_SMARTSHUNTS
+                )
+            else:
+                logging.error(
+                    "%s: Required number of batteries not found. Exiting."
+                    % (dt.now()).strftime("%c")
+                )
             sys.exit()
 
     # #########################################################################
@@ -441,44 +528,47 @@ class DbusAggBatService(object):
     # #########################################################################
 
     def _find_multis(self):
-        logging.info(
-            "%s: Searching Multi/Quatro VEbus: Trial Nr. %d"
-            % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
-        )
-        try:
-            for service in self._dbusConn.list_names():
-                if settings.MULTI_KEY_WORD in service:
-                    self._multi = service
-                    logging.info(
-                        "%s: %s found."
-                        % (
-                            (dt.now()).strftime("%c"),
-                            (self._dbusMon.dbusmon.get_value(service, "/ProductName")),
-                        )
-                    )
-        except Exception:
-            pass
-
-        if self._multi is not None:
-            if settings.NR_OF_MPPTS > 0:
-                self._searchTrials = 0
-                GLib.timeout_add(
-                    1000, self._find_mppts
-                )  # search MPPTs on DBus if present
-            else:
-                self._timeOld = tt.time()
-                GLib.timeout_add(
-                    1000, self._update
-                )  # if no MPPTs start the _update loop
-            return False  # all OK, stop calling this function
-        elif self._searchTrials < settings.SEARCH_TRIALS:
-            self._searchTrials += 1
-            return True  # next trial
-        else:
-            logging.error(
-                "%s: Multi/Quattro not found. Exiting." % (dt.now()).strftime("%c")
+        if len(settings.MULTI_KEY_WORD) > 0:
+            logging.info(
+                "%s: Searching Multi/Quattro VEbus: Trial Nr. %d"
+                % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
             )
-            sys.exit()
+            try:
+                for service in self._dbusConn.list_names():
+                    if settings.MULTI_KEY_WORD in service:
+                        self._multi = service
+                        logging.info(
+                            "%s: %s found."
+                            % (
+                                (dt.now()).strftime("%c"),
+                                (self._dbusMon.dbusmon.get_value(service, "/ProductName")),
+                            )
+                        )
+            except Exception:
+                pass
+
+            if self._multi is None:
+                if self._searchTrials < settings.SEARCH_TRIALS:
+                    self._searchTrials += 1
+                    return True  # next trial
+                else:
+                    logging.error(
+                        "%s: Multi/Quattro not found. Exiting." % (dt.now()).strftime("%c")
+                    )
+                    sys.exit()
+
+        if settings.NR_OF_MPPTS > 0:
+            self._searchTrials = 0
+            GLib.timeout_add(
+                1000, self._find_mppts
+            )  # search MPPTs on DBus if present
+        else:
+            self._timeOld = tt.time()
+            GLib.timeout_add(
+                1000, self._update
+            )  # if no MPPTs start the _update loop
+        return False  # all OK, stop calling this function
+
 
     # ############################################################
     # ############################################################
@@ -912,24 +1002,44 @@ class DbusAggBatService(object):
         ####################################
 
         if settings.CURRENT_FROM_VICTRON:
+            Current_VE = 0
             try:
-                Current_VE = self._dbusMon.dbusmon.get_value(
-                    self._multi, "/Dc/0/Current"
-                )  # get DC current of multi/quattro (or system of them)
+                if self._multi is not None:
+                    Multi_Connected = self._dbusMon.dbusmon.get_value(
+                        self._multi, "/Connected"
+                    )
+                    if Multi_Connected > 0:
+                        Current_VE = self._dbusMon.dbusmon.get_value(
+                            self._multi, "/Dc/0/Current"
+                        )  # get DC current of multi/quattro (or system of them)
+                        if not self._multi_connected:
+                            logging.info("Multi/Quattro is connected.")
+                        self._multi_connected = True
+                    else:
+                        if self._multi_connected:
+                            logging.info("Multi/Quattro is not connected.")
+                        self._multi_connected = False
+
                 for i in range(settings.NR_OF_MPPTS):
                     Current_VE += self._dbusMon.dbusmon.get_value(
                         self._mppts_list[i], "/Dc/0/Current"
                     )  # add DC current of all MPPTs (if present)
 
                 if settings.DC_LOADS:
-                    if settings.INVERT_SMARTSHUNT:
-                        Current_VE += self._dbusMon.dbusmon.get_value(
-                            self._smartShunt, "/Dc/0/Current"
-                        )  # SmartShunt is monitored as a battery
-                    else:
-                        Current_VE -= self._dbusMon.dbusmon.get_value(
-                            self._smartShunt, "/Dc/0/Current"
-                        )
+                    Current_SHUNT = 0
+                    use_shunt_aggregate = False
+                    for i in range(len(self._smartShunt_list)):
+                            shunt_current = self._dbusMon.dbusmon.get_value(
+                                self._smartShunt_list[i], "/Dc/0/Current"
+                            )  # SmartShunt is monitored as a battery
+                            Current_SHUNT += shunt_current
+                            if (abs(shunt_current) < settings.SMARTSHUNT_CURRENT_THRESHOLD) or (settings.SMARTSHUNT_CURRENT_THRESHOLD < 0):
+                                use_shunt_aggregate = True # use SmartShunt aggregate if at least one is below the threshold
+                    if use_shunt_aggregate:
+                        if settings.INVERT_SMARTSHUNT:
+                            Current_VE += Current_SHUNT
+                        else:
+                            Current_VE -= Current_SHUNT
 
                 if Current_VE is not None:
                     Current = Current_VE  # BMS current overwritten only if no exception raised
