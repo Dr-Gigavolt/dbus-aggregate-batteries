@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # fix owner and group
-chown -R root:root /data/etc/dbus-serialbattery
+chown -R root:root /data/dbus-aggregate-batteries
 
 # make files executable
 chmod +x /data/dbus-aggregate-batteries/*.py
