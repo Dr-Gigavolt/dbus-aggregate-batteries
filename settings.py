@@ -72,10 +72,6 @@ CURRENT_FROM_VICTRON = True
 #   e.g. ["FrontShunt", "MiddleShunt", "RearShunt"] would select the respective shunts to be included in the DC current calculation
 MULTIPLE_SMARTSHUNTS = False
 
-# Threshold below which to use sum of currents from SmartShunts as battery current
-# if SMARTSHUNT_CURRENT_THRESHOLD is <= 0 then the SmartShunt current aggregrate is always used
-SMARTSHUNT_CURRENT_THRESHOLD = -1
-
 # If True, the program's own charge counter is used instead of the BMS counters.
 # Necessary for JK BMS due to poor current measurement precision
 # and not implemented 100% and 0% reset except of case of MOSFET disconnection.

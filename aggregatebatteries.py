@@ -1040,19 +1040,15 @@ class DbusAggBatService(object):
 
                 if settings.DC_LOADS:
                     Current_SHUNT = 0
-                    use_shunt_aggregate = False
                     for i in range(len(self._smartShunt_list)): # go over all SmartShunts
                             shunt_current = self._dbusMon.dbusmon.get_value(
                                 self._smartShunt_list[i], "/Dc/0/Current"
                             )  # SmartShunt is monitored as a battery
                             Current_SHUNT += shunt_current
-                            if (abs(shunt_current) < settings.SMARTSHUNT_CURRENT_THRESHOLD) or (settings.SMARTSHUNT_CURRENT_THRESHOLD < 0):
-                                use_shunt_aggregate = True # use SmartShunt aggregate if at least one is below the threshold
-                    if use_shunt_aggregate:
-                        if settings.INVERT_SMARTSHUNT:
-                            Current_VE += Current_SHUNT
-                        else:
-                            Current_VE -= Current_SHUNT
+                    if settings.INVERT_SMARTSHUNT:
+                        Current_VE += Current_SHUNT
+                    else:
+                        Current_VE -= Current_SHUNT
 
                 if Current_VE is not None:
                     Current = Current_VE  # BMS current overwritten only if no exception raised
