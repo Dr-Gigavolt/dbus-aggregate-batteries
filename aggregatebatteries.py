@@ -31,7 +31,7 @@ from threading import Thread
 sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "3.5.20250703"
+VERSION = "3.5.20250707"
 
 class SystemBus(dbus.bus.BusConnection):
     def __new__(cls):
@@ -990,7 +990,7 @@ class DbusAggBatService(object):
 
         # find max. charge voltage (if needed)
         if not settings.OWN_CHARGE_PARAMETERS:
-            if settings.KEEP_MAX_CVL and any("Float" in item for item in ChargeMode_list):
+            if settings.KEEP_MAX_CVL and ("Float" in ChargeMode_list):
                 MaxChargeVoltage = self._fn._max(MaxChargeVoltage_list)
                     
             else:
