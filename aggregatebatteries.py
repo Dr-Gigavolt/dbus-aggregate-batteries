@@ -331,23 +331,23 @@ class DbusAggBatService(object):
 
     def _find_batteries(self):
         self._batteries_dict = {}  # Marvo2011
-        self._smartShunt_list = [] # SmartShunt list - start populating with SmartShunts in the "battery" service in this function
+        self._smartShunt_list = [] # SmartShunt list - will be populated so battery category SmartShunts are at the beginning of the list
         self._num_battery_shunts = 0 # no SmartShunts in the battery category have been found yet
         batteriesCount = 0
         # the following two variables are used when self._ownCharge (read from
         # the charge file), is negative
         Soc = 0 # to accumulate the SoC of the aggregated batteries from their BMSes
         InstalledCapacity = 0 # to accumulate the overall capacity of the aggregated batteries from their BMSes
-        #######################################################
+        ##################################################
         # Logic to interpret the USE_SMARTSHUNTS setting #
-        #######################################################
+        ##################################################
         use_smartshunts = False
         included_smartshunts = [] # list to keep track of which SmartShunts have been included to not match the same shunt twice and to make sure the correct number is matched
         NR_OF_SMARTSHUNTS = 0 # need to find >= 0 NR_OF_SMARTSHUNTS
         if isinstance(settings.USE_SMARTSHUNTS, bool):
-            use_smartshunts = settings.USE_SMARTSHUNTS # True: use all available SmartShunts, False: use single, last SmartShunt
+            use_smartshunts = settings.USE_SMARTSHUNTS # True: use all available SmartShunts, False: don't use any SmartShunt
         elif isinstance(settings.USE_SMARTSHUNTS, (list, tuple)):
-            use_smartshunts = (len(settings.USE_SMARTSHUNTS) > 0) # empty list -> use single, last battery SmartShunt
+            use_smartshunts = (len(settings.USE_SMARTSHUNTS) > 0) # empty list -> don't use any SmartShunt
             if use_smartshunts:
                 NR_SMARTSHUNTS = len(settings.USE_SMARTSHUNTS) # NR_SMARTSHUNTS is the number of SmartShunts specified by the user
             included_smartshunts = [False] * NR_SMARTSHUNTS # initially, no SmartShunt has been found yet
