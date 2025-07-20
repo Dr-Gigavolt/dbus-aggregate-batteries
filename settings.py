@@ -9,18 +9,15 @@ NR_OF_CELLS_PER_BATTERY = 24
 # Nr. of MPPTs
 NR_OF_MPPTS = 1
 
-# If DC loads with Smart Shunt present, can be used for total current measurement.
-DC_LOADS = False
-
-# False: Current subtracted, True: Current added
-INVERT_SMARTSHUNT = False
-
 # ######################################
 # ########### DBus settings ############
 # ######################################
 
-# Key world to identify services of physical Serial Batteries (and SmartShunt if available). You don't need to change it.
+# Key word to identify services of physical Serial Batteries (and SmartShunts set to Battery Mode if available). You don't need to change it.
 BATTERY_SERVICE_NAME = "com.victronenergy.battery"
+
+# Key word to identify DC Load services (for SmartShunts set to DC Metering). You don't need to change it.
+DCLOAD_SERVICE_NAME = "com.victronenergy.dcload"
 
 # Path of Battery Product Name. You don't need to change it.
 BATTERY_PRODUCT_NAME_PATH = "/ProductName"
@@ -35,10 +32,11 @@ BATTERY_PRODUCT_NAME = "SerialBattery"
 # (set up in the BMS and therefore not volatile).
 BATTERY_INSTANCE_NAME_PATH = "/Serial"
 
-# Key world to identify service of Multis/Quattros (or cluster of them).  You don't need to change it.
+# Key word to identify service of Multis/Quattros (or cluster of them).  You don't need to change it.
+# Can be set to an empty string, "", to not use Multi/Quattro current measurements.
 MULTI_KEY_WORD = "com.victronenergy.vebus"
 
-# Key world to identify services of solar chargers. You don't need to change it.
+# Key word to identify services of solar chargers. You don't need to change it.
 MPPT_KEY_WORD = "com.victronenergy.solarcharger"
 
 # Key word to identify services of SmartShunt, if you use it for current into DC loads. You don't need to change it.
@@ -58,19 +56,60 @@ READ_TRIALS = 10
 # ############# Options ################
 # ######################################
 
-# If True, the battery current measurement by Multis/Quattros and MPPTs is taken instead of BMS.
+# If True, the battery current measurement by Multis/Quattros, MPPTs, and/or SmartShunts is taken instead of BMS.
 # Necessary for JK BMS due to poor current measurement precision.
-# The Victron current measurement is very precise, therefore SmartShunt is not needed and not supported.
+# The Victron current measurement is very precise
 CURRENT_FROM_VICTRON = True
 
-# Use multiple SmartShunts and control which ones
-# - False or an empty list is the original default behavior of using the last SmartShunt instance
+# Use SmartShunts for total current measurement and control which ones to use:
+# - False or an empty list means not to use any SmartShunts
 # - True uses all available SmartShunts
 # - a list of VRM instance numbers allows using only certain SmartShunts, e.g. [278, 279] would chose VRM instances 278 and 279
 #   (the VRM instance numbers of the respective SmartShunts can be found in their "Device" page)
 # - a list of unique Smart Shunt names (custom name entry by default, specified with SMARTSHUNT_INSTANCE_NAME_PATH),
 #   e.g. ["FrontShunt", "MiddleShunt", "RearShunt"] would select the respective shunts to be included in the DC current calculation
-MULTIPLE_SMARTSHUNTS = False
+#
+# SmartShunts set to "Battery Monitor" in VictronConnect will be added to the total current while
+# SmartShunts set to "DC Energy Meter" will be subtracted; this can be inverted with INVERT_SMARTSHUNTS below set to True
+#
+# For this option to have an effect, CURRENT_FROM_VICTRON needs to be set to True (which is the default)
+#
+# Note that this is an advanced option that strongly depends on a given system topology and the directions current is flowing
+# at each individual device used to add up to the current present at the system's batteries aggregated.
+# Here are two hopefully common examples:
+# 1. Multi/Quattro, MPPT, and SmartShunt:
+#                         [MPPT]       Batteries: I_A = I_{Multi} + I_{MPPT} - I_{SmartShunt}
+#                            |        +-- [1]
+#    [Multi/Quattro] --------+--------+
+#                            |        +-- [2]
+#                    [SmartShunt #278]
+#                            |
+#                        [DC Load]
+#
+#    Settings: NR_OF_MPPTS=1
+#              MULTI_KEY_WORD="com.victronenergy.vebus"
+#              USE_SMARTSHUNTS=True or [278]
+#              INVERT_SMARTSHUNTS=False (SmartShunt set to "DC energy meter") *or* INVERT_SMARTSHUNTS=True (SmartShunt set to "Battery monitor")
+#
+# 2. Same as above, but with a SmartShunt for each battery:
+#                         [MPPT]                            Batteries: I_A = I_{#279} + I_{#280}:
+#                            |        +-- [SmartShunt #279] -- [1]
+#    [Multi/Quattro] --------+--------+
+#                            |        +-- [SmartShunt #280] -- [2]
+#                    [SmartShunt #278]
+#                            |
+#                        [DC Load]
+#
+#    Settings: NR_OF_MPPTS=0
+#              MULTI_KEY_WORD=""
+#              USE_SMARTSHUNTS=[279, 280]
+#              INVERT_SMARTSHUNTS=False (#279 & #280 set to "Battery monitor") *or* INVERT_SMARTSHUNTS=True (#279 & #280 set to "DC energy meter")
+#    Alternatively, one could also use I_A = I_{Multi} + I_{MPPT} - I_{#278} (settings from 1. with USE_SMARTSHUNTS=[278]),
+#    but as each measurement has an error, using three devices is going to have a larger error bar compared to two.
+USE_SMARTSHUNTS = False
+
+# Invert current accumulation for all SmartShunts used (True: battery ones subtract, DC meters add)
+INVERT_SMARTSHUNTS = False
 
 # If True, the program's own charge counter is used instead of the BMS counters.
 # Necessary for JK BMS due to poor current measurement precision

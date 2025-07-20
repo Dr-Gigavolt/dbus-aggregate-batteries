@@ -332,23 +332,24 @@ class DbusAggBatService(object):
     def _find_batteries(self):
         self._batteries_dict = {}  # Marvo2011
         self._smartShunt_list = [] # SmartShunt list - start populating with SmartShunts in the "battery" service in this function
+        self._num_battery_shunts = 0 # no SmartShunts in the battery category have been found yet
         batteriesCount = 0
         # the following two variables are used when self._ownCharge (read from
         # the charge file), is negative
         Soc = 0 # to accumulate the SoC of the aggregated batteries from their BMSes
         InstalledCapacity = 0 # to accumulate the overall capacity of the aggregated batteries from their BMSes
         #######################################################
-        # Logic to interpret the MULTIPLE_SMARTSHUNTS setting #
+        # Logic to interpret the USE_SMARTSHUNTS setting #
         #######################################################
-        use_multiple_smartshunts = False
+        use_smartshunts = False
         included_smartshunts = [] # list to keep track of which SmartShunts have been included to not match the same shunt twice and to make sure the correct number is matched
         NR_OF_SMARTSHUNTS = 0 # need to find >= 0 NR_OF_SMARTSHUNTS
-        if isinstance(settings.MULTIPLE_SMARTSHUNTS, bool):
-            use_multiple_smartshunts = settings.MULTIPLE_SMARTSHUNTS # True: use all available SmartShunts, False: use single, last SmartShunt
-        elif isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)):
-            use_multiple_smartshunts = (len(settings.MULTIPLE_SMARTSHUNTS) > 0) # empty list -> use single, last battery SmartShunt
-            if use_multiple_smartshunts:
-                NR_SMARTSHUNTS = len(settings.MULTIPLE_SMARTSHUNTS) # NR_SMARTSHUNTS is the number of SmartShunts specified by the user
+        if isinstance(settings.USE_SMARTSHUNTS, bool):
+            use_smartshunts = settings.USE_SMARTSHUNTS # True: use all available SmartShunts, False: use single, last SmartShunt
+        elif isinstance(settings.USE_SMARTSHUNTS, (list, tuple)):
+            use_smartshunts = (len(settings.USE_SMARTSHUNTS) > 0) # empty list -> use single, last battery SmartShunt
+            if use_smartshunts:
+                NR_SMARTSHUNTS = len(settings.USE_SMARTSHUNTS) # NR_SMARTSHUNTS is the number of SmartShunts specified by the user
             included_smartshunts = [False] * NR_SMARTSHUNTS # initially, no SmartShunt has been found yet
         productName = ""
         shuntName = "" # keep track of SmartShunt (user-defined) name as specified by SMARTSHUNT_INSTANCE_NAME_PATH
@@ -360,13 +361,16 @@ class DbusAggBatService(object):
             for service in self._dbusConn.list_names():
                 if "com.victronenergy" in service:
                     logging.info("%s: Dbusmonitor sees: %s" % ((dt.now()).strftime("%c"), service))
-                if settings.BATTERY_SERVICE_NAME in service:
+                battery_service = (settings.BATTERY_SERVICE_NAME in service) # Current device is in Victron "battery" service
+                dcload_service  = (settings.DCLOAD_SERVICE_NAME in service)  # Current device is in Victron "dcload" service (i.e. a SmartShunt set to DC metering)
+                if battery_service or dcload_service:
                     productName = self._dbusMon.dbusmon.get_value(
                         service, settings.BATTERY_PRODUCT_NAME_PATH
                     )
                     shuntName  = self._dbusMon.dbusmon.get_value(
                         service, settings.SMARTSHUNT_INSTANCE_NAME_PATH
                     )
+                if battery_service:
                     if (productName != None) and (settings.BATTERY_PRODUCT_NAME in productName):
                         logging.info("%s: Correct battery product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
                         # Custom name, if exists, Marvo2011
@@ -440,10 +444,14 @@ class DbusAggBatService(object):
                             sys.exit()
 
                         # end of section, Marvo2011
-
-                    elif (
+                
+                ##########################################################
+                # Find SmartShunts in either Battery or DC Load services #
+                ##########################################################
+                if battery_service or dcload_service:
+                    if (
                         (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
-                    ):  # if SmartShunt found, can be used for DC load current
+                    ):  # if SmartShunt found, can be used for battery monitoring or DC load current depending on how it is set
                         shunt_vrm_id = self._dbusMon.dbusmon.get_value(
                              service, "/DeviceInstance"
                         )
@@ -451,38 +459,35 @@ class DbusAggBatService(object):
                             "%s: Correct SmartShunt product name %s found in the service %s"
                             % ((dt.now()).strftime("%c"), productName, service)
                         )
-                        if use_multiple_smartshunts: # user specified using multiple SmartShunts
-                            include_shunt = True # if MULTIPLE_SMARTSHUNTS only `True` and not a list, the conditional below won't run and every SmartShunt is included
-                            if isinstance(settings.MULTIPLE_SMARTSHUNTS, (list, tuple)): # user-specified list of SmartShunts
-                                for shunt_id in range(0, len(settings.MULTIPLE_SMARTSHUNTS)): # go over user-list and see if we can match current shunt
+                        if use_smartshunts: # user specified to use SmartShunts
+                            include_shunt = True # if USE_SMARTSHUNTS is set to `True` and not a list, the conditional below won't run and every SmartShunt is included
+                            if isinstance(settings.USE_SMARTSHUNTS, (list, tuple)): # user-specified list of SmartShunts
+                                for shunt_id in range(0, len(settings.USE_SMARTSHUNTS)): # go over user-list and see if we can match current shunt
                                     if included_smartshunts[shunt_id]: # already included, move along
                                         continue
-                                    if isinstance(settings.MULTIPLE_SMARTSHUNTS[shunt_id], int): # match by VRM Id
-                                        include_shunt = (settings.MULTIPLE_SMARTSHUNTS[shunt_id] == shunt_vrm_id)
-                                    elif isinstance(settings.MULTIPLE_SMARTSHUNTS[shunt_id], str): # match by shuntName (as specified in the SMARTSHUNT_INSTANCE_NAME_PATH field)
-                                        include_shunt = (settings.MULTIPLE_SMARTSHUNTS[shunt_id] == shuntName)
+                                    if isinstance(settings.USE_SMARTSHUNTS[shunt_id], int): # match by VRM Id
+                                        include_shunt = (settings.USE_SMARTSHUNTS[shunt_id] == shunt_vrm_id)
+                                    elif isinstance(settings.USE_SMARTSHUNTS[shunt_id], str): # match by shuntName (as specified in the SMARTSHUNT_INSTANCE_NAME_PATH field)
+                                        include_shunt = (settings.USE_SMARTSHUNTS[shunt_id] == shuntName)
                                     else: # Bail out with an error if list entry is neither string integer nor string
                                         logging.error(
-                                            "%s: Bad element #%d in \"%s\" in MULTIPLE_SMARTSHUNTS list. Entries need to be VRM instance numbers or Name strings. Exiting."
-                                            % (dt.now()).strftime("%c"), shunt_id+1, settings.MULTIPLE_SMARTSHUNTS[shunt_id]
+                                            "%s: Bad element #%d in \"%s\" in USE_SMARTSHUNTS list. Entries need to be VRM instance numbers or Name strings. Exiting."
+                                            % (dt.now()).strftime("%c"), shunt_id+1, settings.USE_SMARTSHUNTS[shunt_id]
                                         )
                                         sys.exit()
-                                    if include_shunt: # if a shunt has been matched as one the user defined, we can get out of this loop
+                                    if include_shunt: # if a shunt has been matched as one the user defined and we haven't included it yet, we can get out of this loop
                                         break
                             if include_shunt: # SmartShunt is added to list
-                                self._smartShunt_list.append(service)
+                                if battery_service: # battery SmartShunts are inserted at the end of the battery part of the list
+                                    self._smartShunt_list.insert(self._num_battery_shunts, service)
+                                    self._num_battery_shunts += 1
+                                else: # dcload SmartShunts get added to the end of the list (which is the end of the dcload part of the list)
+                                    self._smartShunt_list.append(service)
                                 logging.info(
                                     "%s: %s [%d] added, named as: %s."
                                     % ((dt.now()).strftime("%c"), productName, shunt_vrm_id, shuntName)
                                 )
-                        else: # use only one SmartShunt (MULTIPLE_SMARTSHUNTS is False, or an empty list)
-                            if (len(self._smartShunt_list) == 0):
-                                self._smartShunt_list.append(service)
-                            self._smartShunt_list[0] = service # make sure last SmartShunt is used to stick to original behavior
-                            logging.info(
-                                "%s: %s [%d] is now used, named as: %s."
-                                % ((dt.now()).strftime("%c"), productName, shunt_vrm_id, shuntName)
-                            )
+                # end of SmartShunt detection (AT, 2025)
 
         except Exception:
             pass
@@ -539,7 +544,11 @@ class DbusAggBatService(object):
     # #########################################################################
 
     def _find_multis(self):
-        if len(settings.MULTI_KEY_WORD) > 0: # only search for Multi/Quattro devices if that is specified (i.e. users may still want to aggregate their batteries when using no inverter/no Victron inverter/charger)
+        # only search for Multi/Quattro devices if that is specified, possible use-cases:
+        # - no Multi/Quattro device installed (examples: a pure DC system, a different inverter/charger is used)
+        # - current detection of Multi/Quattro is not wanted (i.e. SmartShunts are used instead)
+        # may still want to aggregate their batteries when using no inverter/no Victron inverter/charger)
+        if len(settings.MULTI_KEY_WORD) > 0:
             logging.info(
                 "%s: Searching Multi/Quattro VEbus: Trial Nr. %d"
                 % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
@@ -1038,17 +1047,19 @@ class DbusAggBatService(object):
                         self._mppts_list[i], "/Dc/0/Current"
                     )  # add DC current of all MPPTs (if present)
 
-                if settings.DC_LOADS:
-                    Current_SHUNT = 0
-                    for i in range(len(self._smartShunt_list)): # go over all SmartShunts
-                            shunt_current = self._dbusMon.dbusmon.get_value(
-                                self._smartShunt_list[i], "/Dc/0/Current"
-                            )  # SmartShunt is monitored as a battery
-                            Current_SHUNT += shunt_current
-                    if settings.INVERT_SMARTSHUNT:
-                        Current_VE += Current_SHUNT
-                    else:
-                        Current_VE -= Current_SHUNT
+                Current_SHUNTS = 0
+                for i in range(len(self._smartShunt_list)): # go over all SmartShunts
+                        shunt_current = self._dbusMon.dbusmon.get_value(
+                            self._smartShunt_list[i], "/Dc/0/Current"
+                        )
+                        if i<self._num_battery_shunts: # SmartShunt is monitored as a battery
+                            Current_SHUNTS += shunt_current
+                        else: # SmartShunt is in DC metering mode
+                            Current_SHUNTS -= shunt_current
+                if settings.INVERT_SMARTSHUNTS:
+                    Current_VE -= Current_SHUNTS
+                else:
+                    Current_VE += Current_SHUNTS
 
                 if Current_VE is not None:
                     Current = Current_VE  # BMS current overwritten only if no exception raised
