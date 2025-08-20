@@ -28,13 +28,13 @@ Please report the bugs and propose improvements. Many thanks to all who already 
 The service starts automatically after start/restart of the Venus OS. After modifying of files restart it by executing:
 
 
-`/data/dbus-aggregate-batteries/restart.sh` - it kills the service which starts automatically again
+`/data/apps/dbus-aggregate-batteries/restart.sh` - it kills the service which starts automatically again
 
-`/data/dbus-aggregate-batteries/restart_dbus-serial-battery.sh` - kills all instances of Serial Battery, reinstalls files and starts again
+`/data/apps/dbus-aggregate-batteries/restart_dbus-serial-battery.sh` - kills all instances of Serial Battery, reinstalls files and starts again
 
 If you restart the Serial Battery, wait until all instances are visible, assign CustomNames and restart the Aggregate Batteries
 
-For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: `python3 /data/dbus-aggregate-batteries/aggregatebatteries.py`
+For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: `python3 /data/apps/dbus-aggregate-batteries/aggregatebatteries.py`
 
 Logging file: `tail -F /var/log/dbus-aggregate-batteries/current` or use any text file editor.
 

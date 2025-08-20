@@ -1,2 +1,2 @@
 #!/bin/bash
-bash /data/etc/dbus-serialbattery/reinstall-local.sh
+bash /data/apps/dbus-serialbattery/restart.sh
