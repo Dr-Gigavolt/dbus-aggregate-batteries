@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Service to aggregate multiple serial batteries https://github.com/Louisvdw/dbus-serialbattery
+Service to aggregate multiple serial batteries https://github.com/mr-manuel/venus-os_dbus-serialbattery
 to one virtual battery.
 
 Python location on Venus:
@@ -82,7 +82,7 @@ class DbusAggBatService(object):
         # read initial charge from text file
         try:
             self._charge_file = open(
-                "/data/dbus-aggregate-batteries/charge", "r"
+                "/data/apps/dbus-aggregate-batteries/charge", "r"
             )  # read
             self._ownCharge = float(self._charge_file.readline().strip())
             self._charge_file.close()
@@ -102,7 +102,7 @@ class DbusAggBatService(object):
         ):  # read the day of the last balancing from text file
             try:
                 self._lastBalancing_file = open(
-                    "/data/dbus-aggregate-batteries/last_balancing", "r"
+                    "/data/apps/dbus-aggregate-batteries/last_balancing", "r"
                 )  # read
                 self._lastBalancing = int(self._lastBalancing_file.readline().strip())
                 self._lastBalancing_file.close()
@@ -998,7 +998,7 @@ class DbusAggBatService(object):
                         self._balancing = 0
                         self._lastBalancing = int((dt.now()).strftime("%j"))
                         self._lastBalancing_file = open(
-                            "/data/dbus-aggregate-batteries/last_balancing", "w"
+                            "/data/apps/dbus-aggregate-batteries/last_balancing", "w"
                         )
                         self._lastBalancing_file.write("%s" % self._lastBalancing)
                         self._lastBalancing_file.close()
@@ -1021,7 +1021,7 @@ class DbusAggBatService(object):
                 )
                 self._lastBalancing = int((dt.now()).strftime("%j"))
                 self._lastBalancing_file = open(
-                    "/data/dbus-aggregate-batteries/last_balancing", "w"
+                    "/data/apps/dbus-aggregate-batteries/last_balancing", "w"
                 )
                 self._lastBalancing_file.write("%s" % self._lastBalancing)
                 self._lastBalancing_file.close()
@@ -1145,7 +1145,7 @@ class DbusAggBatService(object):
         if abs(self._ownCharge - self._ownCharge_old) >= (
             settings.CHARGE_SAVE_PRECISION * InstalledCapacity
         ):
-            self._charge_file = open("/data/dbus-aggregate-batteries/charge", "w")
+            self._charge_file = open("/data/apps/dbus-aggregate-batteries/charge", "w")
             self._charge_file.write("%.3f" % self._ownCharge)
             self._charge_file.close()
             self._ownCharge_old = self._ownCharge
