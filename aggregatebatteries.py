@@ -31,7 +31,7 @@ from threading import Thread
 sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "3.5.20250707"
+VERSION = "3.5.20250909"
 
 class SystemBus(dbus.bus.BusConnection):
     def __new__(cls):
