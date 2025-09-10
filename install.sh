@@ -14,10 +14,10 @@ fi
 
 # backup settings.py
 if [ -f "/data/apps/dbus-aggregate-batteries/settings.py" ]; then
-    mv /data/apps/dbus-aggregate-batteries/settings.py /data/apps/dbus-aggregate-batteries_settings.py.backup
-elif [ -f "/data/apps/dbus-aggregate-batteries/settings.py" ]; then
+    cp /data/apps/dbus-aggregate-batteries/settings.py /data/dbus-aggregate-batteries_settings.py.backup
+elif [ -f "/data/dbus-aggregate-batteries/settings.py" ]; then
 	# legacy installation folder
-    mv /data/apps/dbus-aggregate-batteries/settings.py /data/apps/dbus-aggregate-batteries_settings.py.backup
+    cp /data/dbus-aggregate-batteries/settings.py /data/dbus-aggregate-batteries_settings.py.backup
 fi
 
 # download driver
@@ -26,8 +26,8 @@ wget -O dbus-aggregate-batteries_latest.zip https://github.com/Dr-Gigavolt/dbus-
 if [ $? -ne 0 ]; then
     echo "Error during downloading the ZIP file. Please try again."
     # Delete settings.py backup
-    if [ -f "/data/apps/dbus-aggregate-batteries_settings.py.backup" ]; then
-        rm /data/apps/dbus-aggregate-batteries_settings.py.backup
+    if [ -f "/data/dbus-aggregate-batteries_settings.py.backup" ]; then
+        rm /data/dbus-aggregate-batteries_settings.py.backup
     fi
     exit
 fi
@@ -35,8 +35,8 @@ fi
 unzip -q /tmp/dbus-aggregate-batteries_latest.zip
 
 # check if legacy installation folder exists and remove it
-if [ -d "/data/apps/dbus-aggregate-batteries" ]; then
-    rm -rf /data/apps/dbus-aggregate-batteries
+if [ -d "/data/dbus-aggregate-batteries" ]; then
+    rm -rf /data/dbus-aggregate-batteries
 fi
 
 # check if destination folder exists and remove it
@@ -48,12 +48,12 @@ fi
 mv /tmp/dbus-aggregate-batteries-$latest_release /data/apps/dbus-aggregate-batteries
 
 # restore settings.py
-if [ -f "/data/apps/dbus-aggregate-batteries_settings.py.backup" ]; then
+if [ -f "/data/dbus-aggregate-batteries_settings.py.backup" ]; then
     # rename settings.py
     mv /data/apps/dbus-aggregate-batteries/settings.py /data/apps/dbus-aggregate-batteries/settings.new-version.py
     # restore settings.py
     echo "Restore settings.py"
-    mv /data/apps/dbus-aggregate-batteries_settings.py.backup /data/apps/dbus-aggregate-batteries/settings.py
+    mv /data/dbus-aggregate-batteries_settings.py.backup /data/apps/dbus-aggregate-batteries/settings.py
 fi
 
 # start reinstall-local.sh
