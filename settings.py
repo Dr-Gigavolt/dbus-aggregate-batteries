@@ -68,8 +68,8 @@ OWN_SOC = True
 ZERO_SOC = False
 
 # SoC resetting values if OWN_SOC = True and OWN_CHARGE_PARAMETERS = False
-MAX_CELL_VOLTAGE_SOC_FULL = 1.9
-MIN_CELL_VOLTAGE_SOC_EMPTY = 2.5
+MAX_CELL_VOLTAGE_SOC_FULL = 2.5
+MIN_CELL_VOLTAGE_SOC_EMPTY = 1.9
 
 # When the battery charge changes more than CHARGE_SAVE_PRECISION, the "charge" file is updated.
 # It is a trade-off between resolution and file access frequency. The value is relative.
