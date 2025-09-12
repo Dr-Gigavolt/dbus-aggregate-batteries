@@ -3,7 +3,7 @@
 import sys
 import logging
 
-sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
+sys.path.append("/data/apps/dbus-aggregate-batteries/ext/velib_python")
 from dbusmonitor import DbusMonitor  # noqa: E402
 from dbus.mainloop.glib import DBusGMainLoop  # noqa: E402
 

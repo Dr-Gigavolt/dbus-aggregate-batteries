@@ -28,7 +28,7 @@ import time as tt  # for charge measurement
 from dbusmon import DbusMon
 from threading import Thread
 
-sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
+sys.path.append("/data/apps/dbus-aggregate-batteries/ext/velib_python")
 from vedbus import VeDbusService  # noqa: E402
 
 VERSION = "3.5.20250909"
