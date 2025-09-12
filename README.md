@@ -1,3 +1,6 @@
+## Attention!!!
+I deleted releases after June 2025 because there were issues with new installation stcripts. I apologize I have no time to care about it and hope in help of other contributers. If you have upgraded Victron OS and have incompatibility issues with path /data (otherwise don't touch running system) please copy the AggregateBatteries directory into /data/app manually. You can also copy updated Python files from Github manually into your system. Thanks for your understanding.
+
 ## Version 3.6.20250909
 
 Attention: This is my first experience with the Victron system. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in `settings.py`. I extended the description after some users misunderstood it. Please execute command dbus-spy on your Venus OS and review all paths transmitted by Serial Battery instances.
