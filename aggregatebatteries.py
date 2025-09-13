@@ -31,7 +31,8 @@ from threading import Thread
 sys.path.append("/data/apps/dbus-aggregate-batteries/ext/velib_python")
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "3.5.20250909"
+VERSION = "4.0.20250913"
+
 
 class SystemBus(dbus.bus.BusConnection):
     def __new__(cls):
