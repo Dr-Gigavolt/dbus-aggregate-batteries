@@ -74,6 +74,13 @@ CURRENT_FROM_VICTRON = True
 #
 # For this option to have an effect, CURRENT_FROM_VICTRON needs to be set to True (which is the default)
 #
+# By default, if during operation one of the SmartShunts being monitored becomes unavailable an error is raised and a restart occurs:
+# - In the case of using all available SmartShunts with True this means one less SmartShunt will be in the list monitored after restart.
+#   If one wants to add this particular SmartShunt again, a restart of the battery aggregator will be needed.
+# - If a list of specific SmartShunts was specified then a missing SmartShunt will lead to repeated trials until it is present again
+#   and the aggregator works again.
+# - This behavior can be controlled with IGNORE_SMARTSHUNT_ABSENCE below
+#
 # Note that this is an advanced option that strongly depends on a given system topology and the directions current is flowing
 # at each individual device used to add up to the current present at the system's batteries aggregated.
 # Here are two hopefully common examples:
@@ -110,6 +117,15 @@ USE_SMARTSHUNTS = False
 
 # Invert current accumulation for all SmartShunts used (True: battery ones subtract, DC meters add)
 INVERT_SMARTSHUNTS = False
+
+# Controls what happens when a monitored SmartShunt is absent or a read error occurs:
+#    False (default): a restart occurs:
+#        - In the case of using all available SmartShunts with True this means one less SmartShunt will be in the list monitored after restart.
+#          If one wants to add this particular SmartShunt again, a restart of the battery aggregator will be needed.
+#        - If a list of specific SmartShunts was specified then a missing SmartShunt will lead to repeated trials until it is present again
+#          and the aggregator works again.
+#    True: the BMS current reading will be used until the absent SmartShunt becomes available again
+IGNORE_SMARTSHUNT_ABSENCE = False
 
 # If True, the program's own charge counter is used instead of the BMS counters.
 # Necessary for JK BMS due to poor current measurement precision

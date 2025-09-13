@@ -1022,6 +1022,7 @@ class DbusAggBatService(object):
         ####################################
 
         if settings.CURRENT_FROM_VICTRON:
+            success = True
             Current_VE = 0 # variable to accumulate currents measured by Victron stuff (i.e. Multi/Quattro, SmartShunts, MPPTs)
             try:
                 if self._multi is not None: # Read Multi/Quattro data only when one is used and has been found
@@ -1046,35 +1047,45 @@ class DbusAggBatService(object):
                     Current_VE += self._dbusMon.dbusmon.get_value(
                         self._mppts_list[i], "/Dc/0/Current"
                     )  # add DC current of all MPPTs (if present)
-
-                Current_SHUNTS = 0
+            
+            except Exception:
+                success = False
+                logging.error(
+                    "%s: Victron current read error. Using BMS current and power instead."
+                    % (dt.now()).strftime("%c")
+                )  # the BMS values are not overwritten
+                
+            Current_SHUNTS = 0
+            try:
                 for i in range(len(self._smartShunt_list)): # go over all SmartShunts
-                        shunt_current = self._dbusMon.dbusmon.get_value(
-                            self._smartShunt_list[i], "/Dc/0/Current"
-                        )
-                        if i<self._num_battery_shunts: # SmartShunt is monitored as a battery
-                            Current_SHUNTS += shunt_current
-                        else: # SmartShunt is in DC metering mode
-                            Current_SHUNTS -= shunt_current
+                    shunt_current = self._dbusMon.dbusmon.get_value(
+                        self._smartShunt_list[i], "/Dc/0/Current"
+                    )
+                    if shunt_current is None:
+                        raise ValueError(f"SmartShunt {self._smartShunt_list[i]} returns None as current.")
+                if i<self._num_battery_shunts: # SmartShunt is monitored as a battery
+                    Current_SHUNTS += shunt_current
+                else: # SmartShunt is in DC metering mode
+                    Current_SHUNTS -= shunt_current
+            except Exception as err:
+                logging.error("%s: Error during SmartShunt polling: %s" % ((dt.now()).strftime("%c"), err))
+                if settings.IGNORE_SMARTSHUNT_ABSENCE:
+                    success = False
+                    pass
+                else:
+                    sys.exit()
+            if success:
                 if settings.INVERT_SMARTSHUNTS:
                     Current_VE -= Current_SHUNTS
                 else:
                     Current_VE += Current_SHUNTS
-
-                if Current_VE is not None:
-                    Current = Current_VE  # BMS current overwritten only if no exception raised
-                    Power = (
-                        Voltage * Current_VE
-                    )  # calculate own power (not read from BMS)
-                else:
-                    logging.error(
-                        "%s: Victron current is None. Using BMS current and power instead."
-                        % (dt.now()).strftime("%c")
-                    )  # the BMS values are not overwritten
-
-            except Exception:
+                Current = Current_VE  # BMS current overwritten only if no exception raised
+                Power = (
+                    Voltage * Current_VE
+                )  # calculate own power (not read from BMS)
+            else:
                 logging.error(
-                    "%s: Victron current read error. Using BMS current and power instead."
+                    "%s: Victron current reading error. Using BMS current and power instead."
                     % (dt.now()).strftime("%c")
                 )  # the BMS values are not overwritten
 
