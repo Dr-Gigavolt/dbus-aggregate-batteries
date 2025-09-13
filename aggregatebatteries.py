@@ -965,8 +965,6 @@ class DbusAggBatService(object):
             else:
                 return True  # next call allowed
 
-        self._readTrials = 0  # must be reset after try-except
-
         #####################################################
         # Process collected values (except of dictionaries) #
         #####################################################
@@ -1050,10 +1048,6 @@ class DbusAggBatService(object):
             
             except Exception:
                 success = False
-                logging.error(
-                    "%s: Victron current read error. Using BMS current and power instead."
-                    % (dt.now()).strftime("%c")
-                )  # the BMS values are not overwritten
                 
             Current_SHUNTS = 0
             try:
@@ -1073,7 +1067,12 @@ class DbusAggBatService(object):
                     success = False
                     pass
                 else:
-                    sys.exit()
+                    self._readTrials += 1
+                    if self._readTrials > settings.READ_TRIALS:
+                        sys.exit()
+                    else:
+                        return True  # next call allowed
+
             if success:
                 if settings.INVERT_SMARTSHUNTS:
                     Current_VE -= Current_SHUNTS
@@ -1088,7 +1087,9 @@ class DbusAggBatService(object):
                     "%s: Victron current reading error. Using BMS current and power instead."
                     % (dt.now()).strftime("%c")
                 )  # the BMS values are not overwritten
-
+        
+        self._readTrials = 0  # must be reset after try-except of all reads
+        
         ####################################################################################################
         # Calculate own charge/discharge parameters (overwrite the values received from the SerialBattery) #
         ####################################################################################################

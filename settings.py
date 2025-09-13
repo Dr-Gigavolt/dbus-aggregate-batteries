@@ -74,7 +74,8 @@ CURRENT_FROM_VICTRON = True
 #
 # For this option to have an effect, CURRENT_FROM_VICTRON needs to be set to True (which is the default)
 #
-# By default, if during operation one of the SmartShunts being monitored becomes unavailable an error is raised and a restart occurs:
+# By default, if during operation one of the SmartShunts being monitored becomes unavailable an error is raised and
+# a restart occurs (after READ_TRIALS trials):
 # - In the case of using all available SmartShunts with True this means one less SmartShunt will be in the list monitored after restart.
 #   If one wants to add this particular SmartShunt again, a restart of the battery aggregator will be needed.
 # - If a list of specific SmartShunts was specified then a missing SmartShunt will lead to repeated trials until it is present again
@@ -118,8 +119,8 @@ USE_SMARTSHUNTS = False
 # Invert current accumulation for all SmartShunts used (True: battery ones subtract, DC meters add)
 INVERT_SMARTSHUNTS = False
 
-# Controls what happens when a monitored SmartShunt is absent or a read error occurs:
-#    False (default): a restart occurs:
+# Controls what happens when a monitored SmartShunt is absent:
+#    False (default): a restart occurs after READ_TRIALS consecutive read errors:
 #        - In the case of using all available SmartShunts with True this means one less SmartShunt will be in the list monitored after restart.
 #          If one wants to add this particular SmartShunt again, a restart of the battery aggregator will be needed.
 #        - If a list of specific SmartShunts was specified then a missing SmartShunt will lead to repeated trials until it is present again
