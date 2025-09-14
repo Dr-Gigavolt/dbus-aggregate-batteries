@@ -96,7 +96,7 @@ class DbusAggBatService(object):
 
         # read initial charge from text file
         try:
-            self._charge_file = open("/data/apps/dbus-aggregate-batteries/charge", "r")  # read
+            self._charge_file = open("/data/apps/dbus-aggregate-batteries/storedvalue_charge", "r")  # read
             self._ownCharge = float(self._charge_file.readline().strip())
             self._charge_file.close()
             self._ownCharge_old = self._ownCharge
@@ -109,7 +109,7 @@ class DbusAggBatService(object):
         if settings.OWN_CHARGE_PARAMETERS:
             try:
                 self._lastBalancing_file = open(
-                    "/data/apps/dbus-aggregate-batteries/last_balancing",
+                    "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
                     "r",
                 )
                 self._lastBalancing = int(self._lastBalancing_file.readline().strip())
@@ -1005,7 +1005,7 @@ class DbusAggBatService(object):
                         self._balancing = 0
                         self._lastBalancing = int((dt.now()).strftime("%j"))
                         self._lastBalancing_file = open(
-                            "/data/apps/dbus-aggregate-batteries/last_balancing",
+                            "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
                             "w",
                         )
                         self._lastBalancing_file.write("%s" % self._lastBalancing)
@@ -1017,10 +1017,12 @@ class DbusAggBatService(object):
 
             # if normal charging voltage is 100% SoC and balancing is finished
             elif (time_unbalanced > 0) and (Voltage >= CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX):
-                logging.info("%s: Balancing goal reached with full charging set as normal. Updating last_balancing file." % (dt.now()).strftime("%c"))
+                logging.info(
+                    "%s: Balancing goal reached with full charging set as normal. Updating storedvalue_last_balancing file." % (dt.now()).strftime("%c")
+                )
                 self._lastBalancing = int((dt.now()).strftime("%j"))
                 self._lastBalancing_file = open(
-                    "/data/apps/dbus-aggregate-batteries/last_balancing",
+                    "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
                     "w",
                 )
                 self._lastBalancing_file.write("%s" % self._lastBalancing)
@@ -1140,7 +1142,7 @@ class DbusAggBatService(object):
 
         # store the charge into text file if changed significantly (avoid frequent file access)
         if abs(self._ownCharge - self._ownCharge_old) >= (settings.CHARGE_SAVE_PRECISION * InstalledCapacity):
-            self._charge_file = open("/data/apps/dbus-aggregate-batteries/charge", "w")
+            self._charge_file = open("/data/apps/dbus-aggregate-batteries/storedvalue_charge", "w")
             self._charge_file.write("%.3f" % self._ownCharge)
             self._charge_file.close()
             self._ownCharge_old = self._ownCharge
@@ -1285,6 +1287,21 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logging.info("%s: Starting AggregateBatteries." % (dt.now()).strftime("%c"))
     from dbus.mainloop.glib import DBusGMainLoop
+
+    # Check if old value files exist, if yes rename them
+    if os.path.isfile("/data/apps/dbus-aggregate-batteries/charge"):
+        os.rename(
+            "/data/apps/dbus-aggregate-batteries/charge",
+            "/data/apps/dbus-aggregate-batteries/storedvalue_charge",
+        )
+        logging.info("%s: charge file renamed to storedvalue_charge." % (dt.now()).strftime("%c"))
+
+    if os.path.isfile("/data/apps/dbus-aggregate-batteries/last_balancing"):
+        os.rename(
+            "/data/apps/dbus-aggregate-batteries/last_balancing",
+            "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
+        )
+        logging.info("%s: last_balancing file renamed to storedvalue_last_balancing." % (dt.now()).strftime("%c"))
 
     DBusGMainLoop(set_as_default=True)
 
