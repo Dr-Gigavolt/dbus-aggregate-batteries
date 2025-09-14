@@ -118,7 +118,7 @@ class DbusMon:
             "com.victronenergy.vebus": {
                 "/Connected": dummy,
                 "/Dc/0/Current": dummy,
-                "/ProductName": dummy
+                "/ProductName": dummy,
             },
             "com.victronenergy.solarcharger": {
                 "/Dc/0/Current": dummy,
@@ -154,9 +154,7 @@ def main():
     # dbusmon.print_values('com.victronenergy.vebus.ttyUSB0', 'com.victronenergy.vebus')
     # dbusmon.print_values('com.victronenergy.solarcharger.ttyUSB1', 'com.victronenergy.solarcharger')
     dbusmon.print_values("com.victronenergy.settings", "com.victronenergy.settings")
-    dbusmon.dbusmon.set_value(
-        "com.victronenergy.settings", "/Settings/CGwacs/OvervoltageFeedIn", 0
-    )
+    dbusmon.dbusmon.set_value("com.victronenergy.settings", "/Settings/CGwacs/OvervoltageFeedIn", 0)
 
     # GLib.timeout_add(1000, dbusmon.print_values, 'com.victronenergy.battery.ttyUSB2')
     # Start and run the mainloop
