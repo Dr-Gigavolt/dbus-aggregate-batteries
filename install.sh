@@ -25,6 +25,28 @@ function backup_config {
         mv /data/dbus-aggregate-batteries/settings.py /data/dbus-aggregate-batteries_settings.py.backup
         echo "settings.py backed up to /data/dbus-aggregate-batteries_settings.py.backup"
     fi
+
+    # backup storedvalue_charge
+    # driver >= v4.0.0
+    if [ -f "/data/apps/dbus-aggregate-batteries/storedvalue_charge" ]; then
+        mv /data/apps/dbus-aggregate-batteries/storedvalue_charge /data/apps/dbus-aggregate-batteries_storedvalue_charge.backup
+        echo "storedvalue_charge backed up to /data/apps/dbus-aggregate-batteries_storedvalue_charge.backup"
+    # driver < v4.0.0
+    elif [ -f "/data/dbus-aggregate-batteries/charge" ]; then
+        mv /data/dbus-aggregate-batteries/charge /data/dbus-aggregate-batteries_charge.backup
+        echo "charge backed up to /data/dbus-aggregate-batteries_charge.backup"
+    fi
+
+    # backup storedvalue_last_balancing
+    # driver >= v4.0.0
+    if [ -f "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing" ]; then
+        mv /data/apps/dbus-aggregate-batteries/storedvalue_last_balancing /data/apps/dbus-aggregate-batteries_storedvalue_last_balancing.backup
+        echo "storedvalue_last_balancing backed up to /data/apps/dbus-aggregate-batteries_storedvalue_last_balancing.backup"
+    # driver < v4.0.0
+    elif [ -f "/data/dbus-aggregate-batteries/last_balancing" ]; then
+        mv /data/dbus-aggregate-batteries/last_balancing /data/dbus-aggregate-batteries_last_balancing.backup
+        echo "last_balancing backed up to /data/dbus-aggregate-batteries_last_balancing.backup"
+    fi
 }
 
 function restore_config {
@@ -50,6 +72,56 @@ function restore_config {
         elif [ -d "/data/dbus-aggregate-batteries" ]; then
             mv /data/dbus-aggregate-batteries_settings.py.backup /data/dbus-aggregate-batteries/settings.py
             echo "settings.py restored to /data/dbus-aggregate-batteries/settings.py"
+        fi
+    fi
+
+    # restore storedvalue_charge
+    # installation of driver >= v4.0.0
+    if [ -f "/data/apps/dbus-aggregate-batteries_storedvalue_charge.backup" ]; then
+        # restore to driver >= v4.0.0 (normal update)
+        if [ -d "/data/apps/dbus-aggregate-batteries" ]; then
+            mv /data/apps/dbus-aggregate-batteries_storedvalue_charge.backup /data/apps/dbus-aggregate-batteries/storedvalue_charge
+            echo "storedvalue_charge restored to /data/apps/dbus-aggregate-batteries/storedvalue_charge"
+        # restore to driver < v4.0.0 (downgrade)
+        elif [ -d "/data/dbus-aggregate-batteries" ]; then
+            mv /data/apps/dbus-aggregate-batteries_storedvalue_charge.backup /data/dbus-aggregate-batteries/charge
+            echo "storedvalue_charge restored to /data/dbus-aggregate-batteries/charge"
+        fi
+    # installation of driver < v4.0.0
+    elif [ -f "/data/dbus-aggregate-batteries_charge.backup" ]; then
+        # restore to driver >= v4.0.0 (upgrade)
+        if [ -d "/data/apps/dbus-aggregate-batteries" ]; then
+            mv /data/dbus-aggregate-batteries_charge.backup /data/apps/dbus-aggregate-batteries/storedvalue_charge
+            echo "charge restored to /data/apps/dbus-aggregate-batteries/storedvalue_charge"
+        # restore to driver < v4.0.0 (normal update)
+        elif [ -d "/data/dbus-aggregate-batteries" ]; then
+            mv /data/dbus-aggregate-batteries_charge.backup /data/dbus-aggregate-batteries/charge
+            echo "charge restored to /data/dbus-aggregate-batteries/charge"
+        fi
+    fi
+
+    # restore storedvalue_last_balancing
+    # installation of driver >= v4.0.0
+    if [ -f "/data/apps/dbus-aggregate-batteries_storedvalue_last_balancing.backup" ]; then
+        # restore to driver >= v4.0.0 (normal update)
+        if [ -d "/data/apps/dbus-aggregate-batteries" ]; then
+            mv /data/apps/dbus-aggregate-batteries_storedvalue_last_balancing.backup /data/apps/dbus-aggregate-batteries/storedvalue_last_balancing
+            echo "storedvalue_last_balancing restored to /data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
+        # restore to driver < v4.0.0 (downgrade)
+        elif [ -d "/data/dbus-aggregate-batteries" ]; then
+            mv /data/apps/dbus-aggregate-batteries_storedvalue_last_balancing.backup /data/dbus-aggregate-batteries/last_balancing
+            echo "storedvalue_last_balancing restored to /data/dbus-aggregate-batteries/last_balancing"
+        fi
+    # installation of driver < v4.0.0
+    elif [ -f "/data/dbus-aggregate-batteries_last_balancing.backup" ]; then
+        # restore to driver >= v4.0.0 (upgrade)
+        if [ -d "/data/apps/dbus-aggregate-batteries" ]; then
+            mv /data/dbus-aggregate-batteries_last_balancing.backup /data/apps/dbus-aggregate-batteries/storedvalue_last_balancing
+            echo "last_balancing restored to /data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
+        # restore to driver < v4.0.0 (normal update)
+        elif [ -d "/data/dbus-aggregate-batteries" ]; then
+            mv /data/dbus-aggregate-batteries_last_balancing.backup /data/dbus-aggregate-batteries/last_balancing
+            echo "last_balancing restored to /data/dbus-aggregate-batteries/last_balancing"
         fi
     fi
 }
