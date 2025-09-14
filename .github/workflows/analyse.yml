@@ -1,0 +1,37 @@
+name: "Black lint and flake8 checks"
+
+on:
+  push:
+    # Run on all branches
+    branches:
+      - '**'
+    # Run on any file change
+    paths:
+      - '**/*.py'
+  pull_request:
+    # Run on all branches
+    branches:
+      - '**'
+    # Run on any file change
+    paths:
+      - '**/*.py'
+
+jobs:
+  analyse:
+    name: Analyze using Black Lint and Flake8
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Perform black lint check
+      uses: psf/black@stable
+
+    - name: Perform flake8 lint check
+      uses: py-actions/flake8@v2
