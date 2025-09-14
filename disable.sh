@@ -15,7 +15,7 @@ rm -rf /service/dbus-aggregate-batteries
 # kill driver, if still running
 pkill -f "supervise dbus-aggregate-batteries"
 pkill -f "multilog .* /var/log/dbus-aggregate-batteries"
-pkill -f "python .*/dbus-aggregate-batteries/aggregatebatteries.py"
+pkill -f "python .*/dbus-aggregate-batteries/dbus-aggregate-batteries.py"
 
 # remove enable script from rc.local
 sed -i "\;bash /data/apps/dbus-aggregate-batteries/enable.sh > /data/apps/dbus-aggregate-batteries/startup.log 2>&1 &;d" /data/rc.local

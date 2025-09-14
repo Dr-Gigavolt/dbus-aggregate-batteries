@@ -13,7 +13,7 @@ svc -d "/service/dbus-aggregate-batteries"
 
 
 # kill driver, if still running
-pkill -f "python .*/dbus-aggregate-batteries/aggregatebatteries.py"
+pkill -f "python .*/dbus-aggregate-batteries/dbus-aggregate-batteries.py"
 
 
 
