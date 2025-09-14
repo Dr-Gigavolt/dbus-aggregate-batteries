@@ -5,7 +5,7 @@ trap 'kill -TERM $PID' TERM INT
 
 # Start the main process
 exec 2>&1
-exec python3 /data/apps/dbus-aggregate-batteries/aggregatebatteries.py &
+exec python3 /data/apps/dbus-aggregate-batteries/dbus-aggregate-batteries.py &
 
 # Capture the PID of the child process
 PID=$!
