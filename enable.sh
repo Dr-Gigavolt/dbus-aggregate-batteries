@@ -44,7 +44,7 @@ sleep 1
 # kill driver, if still running
 pkill -f "supervise dbus-aggregate-batteries"
 pkill -f "multilog .* /var/log/dbus-aggregate-batteries"
-pkill -f "python .*/dbus-aggregate-batteries/aggregatebatteries.py"
+pkill -f "python .*/dbus-aggregate-batteries/dbus-aggregate-batteries.py"
 
 
 

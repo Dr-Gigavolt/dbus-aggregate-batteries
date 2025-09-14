@@ -75,20 +75,20 @@ if [ -z "$1" ]; then
     latest_release_beta=$(curl -s https://api.github.com/repos/Dr-Gigavolt/dbus-aggregate-batteries/releases | sed -nE 's/.*"tag_name": "([^"]+(rc|beta))".*/\1/p' | head -n 1)
 
     # main branch
-    latest_release_nightly=$(curl -s https://raw.githubusercontent.com/Dr-Gigavolt/dbus-aggregate-batteries/refs/heads/main/aggregatebatteries.py | grep "VERSION =" | awk -F'"' '{print "v" $2}')
+    latest_release_nightly=$(curl -s https://raw.githubusercontent.com/Dr-Gigavolt/dbus-aggregate-batteries/refs/heads/main/dbus-aggregate-batteries.py | grep "VERSION =" | awk -F'"' '{print "v" $2}')
 
     # done
     echo " done."
 
     # show current installed version
     # driver >= v4.0.0
-    if [ -f "/data/apps/dbus-aggregate-batteries/aggregatebatteries.py" ]; then
-        current_version=$(grep "VERSION =" /data/apps/dbus-aggregate-batteries/aggregatebatteries.py | awk -F'"' '{print $2}')
+    if [ -f "/data/apps/dbus-aggregate-batteries/dbus-aggregate-batteries.py" ]; then
+        current_version=$(grep "VERSION =" /data/apps/dbus-aggregate-batteries/dbus-aggregate-batteries.py | awk -F'"' '{print $2}')
         echo
         echo "** Currently installed version: v$current_version **"
     # driver < v4.0.0
-    elif [ -f "/data/dbus-aggregate-batteries/aggregatebatteries.py" ]; then
-        current_version=$(grep "VERSION =" /data/dbus-aggregate-batteries/aggregatebatteries.py | awk -F'"' '{print $2}')
+    elif [ -f "/data/dbus-aggregate-batteries/dbus-aggregate-batteries.py" ]; then
+        current_version=$(grep "VERSION =" /data/dbus-aggregate-batteries/dbus-aggregate-batteries.py | awk -F'"' '{print $2}')
         echo
         echo "** Currently installed version: v$current_version **"
     fi
