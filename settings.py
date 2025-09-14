@@ -13,7 +13,8 @@ NR_OF_MPPTS = 1
 # ########### DBus settings ############
 # ######################################
 
-# Key word to identify services of physical Serial Batteries (and SmartShunts set to Battery Mode if available). You don't need to change it.
+# Key word to identify services of physical Serial Batteries (and SmartShunts set to Battery Mode if available).
+# You don't need to change it.
 BATTERY_SERVICE_NAME = "com.victronenergy.battery"
 
 # Key word to identify DC Load services (for SmartShunts set to DC Metering). You don't need to change it.
@@ -22,8 +23,8 @@ DCLOAD_SERVICE_NAME = "com.victronenergy.dcload"
 # Path of Battery Product Name. You don't need to change it.
 BATTERY_PRODUCT_NAME_PATH = "/ProductName"
 
-# Key world to identify the batteries (to exclude SmartShunt). If the BATTERY_PRODUCT_NAME_PATH, e.g. SerialBattery(Jkbms),
-# contains this key word, the device will be identified and included into the battery list. 
+# Key world to identify the batteries (to exclude SmartShunt). If the BATTERY_PRODUCT_NAME_PATH,
+# e.g. SerialBattery(Jkbms), contains this key word, the device will be identified and included into the battery list.
 BATTERY_PRODUCT_NAME = "SerialBattery"
 
 # The name stored in the here selected BATTERY_INSTANCE_NAME_PATH will be taken as the name of the battery in the list.
@@ -44,7 +45,7 @@ SMARTSHUNT_NAME_KEY_WORD = "SmartShunt"
 
 # When explicitly naming multiple SmartShunts (MULTIPLE_SMARTSHUNTS option below), use the names from this source
 # A good default is "/CustomName", it does not need to be changed.
-SMARTSHUNT_INSTANCE_NAME_PATH="/CustomName"
+SMARTSHUNT_INSTANCE_NAME_PATH = "/CustomName"
 
 # Trials to identify of all batteries before exit and restart.
 SEARCH_TRIALS = 10
@@ -64,26 +65,29 @@ CURRENT_FROM_VICTRON = True
 # Use SmartShunts for total current measurement and control which ones to use:
 # - False or an empty list means not to use any SmartShunts
 # - True uses all available SmartShunts
-# - a list of VRM instance numbers allows using only certain SmartShunts, e.g. [278, 279] would chose VRM instances 278 and 279
-#   (the VRM instance numbers of the respective SmartShunts can be found in their "Device" page)
+# - a list of VRM instance numbers allows using only certain SmartShunts, e.g. [278, 279] would chose VRM
+#   instances 278 and 279 (the VRM instance numbers of the respective SmartShunts can be found in their "Device" page)
 # - a list of unique Smart Shunt names (custom name entry by default, specified with SMARTSHUNT_INSTANCE_NAME_PATH),
-#   e.g. ["FrontShunt", "MiddleShunt", "RearShunt"] would select the respective shunts to be included in the DC current calculation
+#   e.g. ["FrontShunt", "MiddleShunt", "RearShunt"] would select the respective shunts to be included in the DC current
+#   calculation
 #
 # SmartShunts set to "Battery Monitor" in VictronConnect will be added to the total current while
-# SmartShunts set to "DC Energy Meter" will be subtracted; this can be inverted with INVERT_SMARTSHUNTS below set to True
+# SmartShunts set to "DC Energy Meter" will be subtracted; this can be inverted with INVERT_SMARTSHUNTS below set
+# to True
 #
 # For this option to have an effect, CURRENT_FROM_VICTRON needs to be set to True (which is the default)
 #
 # By default, if during operation one of the SmartShunts being monitored becomes unavailable an error is raised and
 # a restart occurs (after READ_TRIALS trials):
-# - In the case of using all available SmartShunts with True this means one less SmartShunt will be in the list monitored after restart.
-#   If one wants to add this particular SmartShunt again, a restart of the battery aggregator will be needed.
-# - If a list of specific SmartShunts was specified then a missing SmartShunt will lead to repeated trials until it is present again
-#   and the aggregator works again.
+# - In the case of using all available SmartShunts with True this means one less SmartShunt will be in the list
+#   monitored after restart. If one wants to add this particular SmartShunt again, a restart of the battery aggregator
+#   will be needed.
+# - If a list of specific SmartShunts was specified then a missing SmartShunt will lead to repeated trials until it is
+#   present again and the aggregator works again.
 # - This behavior can be controlled with IGNORE_SMARTSHUNT_ABSENCE below
 #
-# Note that this is an advanced option that strongly depends on a given system topology and the directions current is flowing
-# at each individual device used to add up to the current present at the system's batteries aggregated.
+# Note that this is an advanced option that strongly depends on a given system topology and the directions current is
+# flowing at each individual device used to add up to the current present at the system's batteries aggregated.
 # Here are two hopefully common examples:
 # 1. Multi/Quattro, MPPT, and SmartShunt:
 #                         [MPPT]       Batteries: I_A = I_{Multi} + I_{MPPT} - I_{SmartShunt}
@@ -94,10 +98,12 @@ CURRENT_FROM_VICTRON = True
 #                            |
 #                        [DC Load]
 #
-#    Settings: NR_OF_MPPTS=1
-#              MULTI_KEY_WORD="com.victronenergy.vebus"
-#              USE_SMARTSHUNTS=True or [278]
-#              INVERT_SMARTSHUNTS=False (SmartShunt set to "DC energy meter") *or* INVERT_SMARTSHUNTS=True (SmartShunt set to "Battery monitor")
+#    Settings: NR_OF_MPPTS = 1
+#              MULTI_KEY_WORD = "com.victronenergy.vebus"
+#              USE_SMARTSHUNTS = True or [278]
+#              INVERT_SMARTSHUNTS = False (SmartShunt set to "DC energy meter")
+#              *or*
+#              INVERT_SMARTSHUNTS = True (SmartShunt set to "Battery monitor")
 #
 # 2. Same as above, but with a SmartShunt for each battery:
 #                         [MPPT]                            Batteries: I_A = I_{#279} + I_{#280}:
@@ -108,12 +114,15 @@ CURRENT_FROM_VICTRON = True
 #                            |
 #                        [DC Load]
 #
-#    Settings: NR_OF_MPPTS=0
-#              MULTI_KEY_WORD=""
-#              USE_SMARTSHUNTS=[279, 280]
-#              INVERT_SMARTSHUNTS=False (#279 & #280 set to "Battery monitor") *or* INVERT_SMARTSHUNTS=True (#279 & #280 set to "DC energy meter")
-#    Alternatively, one could also use I_A = I_{Multi} + I_{MPPT} - I_{#278} (settings from 1. with USE_SMARTSHUNTS=[278]),
-#    but as each measurement has an error, using three devices is going to have a larger error bar compared to two.
+#    Settings: NR_OF_MPPTS = 0
+#              MULTI_KEY_WORD = ""
+#              USE_SMARTSHUNTS = [279, 280]
+#              INVERT_SMARTSHUNTS = False (#279 & #280 set to "Battery monitor")
+#              *or*
+#              INVERT_SMARTSHUNTS = True (#279 & #280 set to "DC energy meter")
+#    Alternatively, one could also use I_A = I_{Multi} + I_{MPPT} - I_{#278}
+#    (settings from 1. with USE_SMARTSHUNTS = [278]), but as each measurement has an error, using three
+#    devices is going to have a larger error bar compared to two.
 USE_SMARTSHUNTS = False
 
 # Invert current accumulation for all SmartShunts used (True: battery ones subtract, DC meters add)
@@ -121,10 +130,11 @@ INVERT_SMARTSHUNTS = False
 
 # Controls what happens when a monitored SmartShunt is absent:
 #    False (default): a restart occurs after READ_TRIALS consecutive read errors:
-#        - In the case of using all available SmartShunts with True this means one less SmartShunt will be in the list monitored after restart.
-#          If one wants to add this particular SmartShunt again, a restart of the battery aggregator will be needed.
-#        - If a list of specific SmartShunts was specified then a missing SmartShunt will lead to repeated trials until it is present again
-#          and the aggregator works again.
+#        - In the case of using all available SmartShunts with True this means one less SmartShunt will be in the
+#          list monitored after restart. If one wants to add this particular SmartShunt again, a restart of the
+#          battery aggregator will be needed.
+#        - If a list of specific SmartShunts was specified then a missing SmartShunt will lead to repeated trials
+#          until it is present again and the aggregator works again.
 #    True: the BMS current reading will be used until the absent SmartShunt becomes available again
 IGNORE_SMARTSHUNT_ABSENCE = False
 
@@ -192,9 +202,10 @@ MIN_CELL_VOLTAGE = 1.9
 # Allows discharge again above MIN_CELL_VOLTAGE + MIN_CELL_HYSTERESIS
 MIN_CELL_HYSTERESIS = 0.3
 
-# Cell balancing (with BALANCING_VOLTAGE) goal in volts. When reached, the charging voltage limit per cell is reduced
-# from BALANCING_VOLTAGE down to CHARGE_VOLTAGE from the CHARGE_VOLTAGE_LIST. If due to heavy disbalance the dynamic CVL
-#  was activated and DC-coupled PV feed-in was de-activated, these measures are finished when the balancing goal is reached.
+# Cell balancing (with BALANCING_VOLTAGE) goal in volts. When reached, the charging voltage limit per cell is
+# reduced from BALANCING_VOLTAGE down to CHARGE_VOLTAGE from the CHARGE_VOLTAGE_LIST. If due to heavy disbalance
+# the dynamic CVL was activated and DC-coupled PV feed-in was de-activated, these measures are finished when the
+# balancing goal is reached.
 CELL_DIFF_MAX = 0.025
 
 # Charge fed into batteries is multiplied by efficiency in order to consider losses and enhance SoC counter precision.
@@ -207,11 +218,21 @@ MAX_CHARGE_CURRENT = 200
 MAX_DISCHARGE_CURRENT = 200
 
 # Settings limiting charge current when at least one cell is getting full or empty. The lists may have any length,
-# but the length must be same for voltage and current. Linear interpolation is used for values between. 
-# The charge current limitation of empty cell reduces inverter power in case when the battery has to be charged from grid.
+# but the length must be same for voltage and current. Linear interpolation is used for values between.
+# The charge current limitation of empty cell reduces inverter power in case when the battery has to be charged
+# from grid.
 
-CELL_CHARGE_LIMITING_VOLTAGE = [MIN_CELL_VOLTAGE, MIN_CELL_VOLTAGE + 0.05, BALANCING_VOLTAGE - 0.1, BALANCING_VOLTAGE, MAX_CELL_VOLTAGE]  # [min, ... ,max]; low voltage: limiting current from grid
-CELL_CHARGE_LIMITED_CURRENT = [0.2, 1, 1, 0.1, 0] # [min, ... ,max]
+# [min, ... ,max]; low voltage: limiting current from grid
+CELL_CHARGE_LIMITING_VOLTAGE = [
+    MIN_CELL_VOLTAGE,
+    MIN_CELL_VOLTAGE + 0.05,
+    BALANCING_VOLTAGE - 0.1,
+    BALANCING_VOLTAGE,
+    MAX_CELL_VOLTAGE,
+]
+
+# [min, ... ,max]
+CELL_CHARGE_LIMITED_CURRENT = [0.2, 1, 1, 0.1, 0]
 
 # Settings limiting discharge current if at least one cell is getting empty. The lists may have any length,
 # but the same length for voltage and current. Linear interpolation is used for values between.
