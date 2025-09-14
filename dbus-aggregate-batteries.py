@@ -23,8 +23,12 @@ import dbus
 import re
 import settings
 from functions import Functions
-from datetime import datetime as dt  # for UTC time stamps for logging
-import time as tt  # for charge measurement
+
+# for UTC time stamps for logging
+from datetime import datetime as dt
+
+# for charge measurement
+import time as tt
 from dbusmon import DbusMon
 from threading import Thread
 
@@ -47,15 +51,19 @@ class SessionBus(dbus.bus.BusConnection):
 def get_bus() -> dbus.bus.BusConnection:
     return SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
 
+
 class DbusAggBatService(object):
 
     def __init__(self, servicename="com.victronenergy.battery.aggregate"):
         self._fn = Functions()
-        self._batteries_dict = {}  # marvo2011
+        self._batteries_dict = {}
         self._multi = None
         self._mppts_list = []
-        self._smartShunt_list = [] # store list of SmartShunts as specified in settings.py
-        self._num_battery_shunts = 0 # the number of SmartShunts at the beginning of _smartShunt_list that are in the battery service (dc_load are listed behind)
+        # store list of SmartShunts as specified in settings.py
+        self._smartShunt_list = []
+        # the number of SmartShunts at the beginning of _smartShunt_list that are in the
+        # battery service (dc_load are listed behind)
+        self._num_battery_shunts = 0
         self._searchTrials = 0
         self._readTrials = 0
         self._MaxChargeVoltage_old = 0
@@ -88,46 +96,33 @@ class DbusAggBatService(object):
 
         # read initial charge from text file
         try:
-            self._charge_file = open(
-                "/data/apps/dbus-aggregate-batteries/charge", "r"
-            )  # read
+            self._charge_file = open("/data/apps/dbus-aggregate-batteries/charge", "r")  # read
             self._ownCharge = float(self._charge_file.readline().strip())
             self._charge_file.close()
             self._ownCharge_old = self._ownCharge
-            logging.info(
-                "%s: Initial Ah read from file: %.0fAh"
-                % ((dt.now()).strftime("%c"), self._ownCharge)
-            )
+            logging.info("%s: Initial Ah read from file: %.0fAh" % ((dt.now()).strftime("%c"), self._ownCharge))
         except Exception:
-            logging.error(
-                "%s: Charge file read error. Exiting." % (dt.now()).strftime("%c")
-            )
+            logging.error("%s: Charge file read error. Exiting." % (dt.now()).strftime("%c"))
             sys.exit()
 
-        if (
-            settings.OWN_CHARGE_PARAMETERS
-        ):  # read the day of the last balancing from text file
+        # read the day of the last balancing from text file
+        if settings.OWN_CHARGE_PARAMETERS:
             try:
                 self._lastBalancing_file = open(
-                    "/data/apps/dbus-aggregate-batteries/last_balancing", "r"
-                )  # read
+                    "/data/apps/dbus-aggregate-batteries/last_balancing",
+                    "r",
+                )
                 self._lastBalancing = int(self._lastBalancing_file.readline().strip())
                 self._lastBalancing_file.close()
-                time_unbalanced = (
-                    int((dt.now()).strftime("%j")) - self._lastBalancing
-                )  # in days
+                # in days
+                time_unbalanced = int((dt.now()).strftime("%j")) - self._lastBalancing
                 if time_unbalanced < 0:
-                    time_unbalanced += 365  # year change
-                logging.info(
-                    "%s: Last balancing done at the %d. day of the year"
-                    % ((dt.now()).strftime("%c"), self._lastBalancing)
-                )
+                    # year change
+                    time_unbalanced += 365
+                logging.info("%s: Last balancing done at the %d. day of the year" % ((dt.now()).strftime("%c"), self._lastBalancing))
                 logging.info("Batteries balanced %d days ago." % time_unbalanced)
             except Exception:
-                logging.error(
-                    "%s: Last balancing file read error. Exiting."
-                    % (dt.now()).strftime("%c")
-                )
+                logging.error("%s: Last balancing file read error. Exiting." % (dt.now()).strftime("%c"))
                 sys.exit()
 
         # Create the management objects, as specified in the ccgx dbus-api document
@@ -143,7 +138,6 @@ class DbusAggBatService(object):
         self._dbusservice.add_path("/FirmwareVersion", VERSION)
         self._dbusservice.add_path("/HardwareVersion", VERSION)
         self._dbusservice.add_path("/Connected", 1)
-        
 
         # Create DC paths
         self._dbusservice.add_path(
@@ -178,9 +172,7 @@ class DbusAggBatService(object):
             None,
             gettextcallback=lambda a, x: "{:.0f}Ah".format(x),
         )
-        self._dbusservice.add_path(
-            "/ConsumedAmphours", None, gettextcallback=lambda a, x: "{:.0f}Ah".format(x)
-        )
+        self._dbusservice.add_path("/ConsumedAmphours", None, gettextcallback=lambda a, x: "{:.0f}Ah".format(x))
 
         # Create temperature paths
         self._dbusservice.add_path("/Dc/0/Temperature", None, writeable=True)
@@ -193,24 +185,20 @@ class DbusAggBatService(object):
             None,
             writeable=True,
             gettextcallback=lambda a, x: "{:.3f}V".format(x),
-        )  # marvo2011
+        )
         self._dbusservice.add_path("/System/MinVoltageCellId", None, writeable=True)
         self._dbusservice.add_path(
             "/System/MaxCellVoltage",
             None,
             writeable=True,
             gettextcallback=lambda a, x: "{:.3f}V".format(x),
-        )  # marvo2011
+        )
         self._dbusservice.add_path("/System/MaxVoltageCellId", None, writeable=True)
         self._dbusservice.add_path("/System/NrOfCellsPerBattery", None, writeable=True)
         self._dbusservice.add_path("/System/NrOfModulesOnline", None, writeable=True)
         self._dbusservice.add_path("/System/NrOfModulesOffline", None, writeable=True)
-        self._dbusservice.add_path(
-            "/System/NrOfModulesBlockingCharge", None, writeable=True
-        )
-        self._dbusservice.add_path(
-            "/System/NrOfModulesBlockingDischarge", None, writeable=True
-        )
+        self._dbusservice.add_path("/System/NrOfModulesBlockingCharge", None, writeable=True)
+        self._dbusservice.add_path("/System/NrOfModulesBlockingDischarge", None, writeable=True)
         self._dbusservice.add_path(
             "/Voltages/Sum",
             None,
@@ -235,9 +223,7 @@ class DbusAggBatService(object):
         self._dbusservice.add_path("/Alarms/HighDischargeCurrent", None, writeable=True)
         self._dbusservice.add_path("/Alarms/CellImbalance", None, writeable=True)
         self._dbusservice.add_path("/Alarms/InternalFailure", None, writeable=True)
-        self._dbusservice.add_path(
-            "/Alarms/HighChargeTemperature", None, writeable=True
-        )
+        self._dbusservice.add_path("/Alarms/HighChargeTemperature", None, writeable=True)
         self._dbusservice.add_path("/Alarms/LowChargeTemperature", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighTemperature", None, writeable=True)
         self._dbusservice.add_path("/Alarms/LowTemperature", None, writeable=True)
@@ -269,11 +255,12 @@ class DbusAggBatService(object):
         # register VeDbusService after all paths where added
         logging.info("### Registering VeDbusService")
         self._dbusservice.register()
-        
+
         x = Thread(target=self._startMonitor)
         x.start()
 
-        GLib.timeout_add(1000, self._find_settings)  # search com.victronenergy.settings
+        # search com.victronenergy.settings
+        GLib.timeout_add(1000, self._find_settings)
 
     # #############################################################################################################
     # #############################################################################################################
@@ -293,35 +280,27 @@ class DbusAggBatService(object):
     # ####################################################################
 
     def _find_settings(self):
-        logging.info(
-            "%s: Searching Settings: Trial Nr. %d"
-            % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
-        )
+        logging.info("%s: Searching Settings: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
         try:
             for service in self._dbusConn.list_names():
                 if "com.victronenergy.settings" in service:
                     self._settings = service
-                    logging.info(
-                        "%s: com.victronenergy.settings found."
-                        % (dt.now()).strftime("%c")
-                    )
+                    logging.info("%s: com.victronenergy.settings found." % (dt.now()).strftime("%c"))
         except Exception:
             pass
 
         if self._settings is not None:
             self._searchTrials = 0
-            GLib.timeout_add(
-                5000, self._find_batteries
-            )  # search batteries on DBus if present
-            return False  # all OK, stop calling this function
+            # search batteries on DBus if present
+            GLib.timeout_add(5000, self._find_batteries)
+            # all OK, stop calling this function
+            return False
         elif self._searchTrials < settings.SEARCH_TRIALS:
             self._searchTrials += 1
-            return True  # next trial
+            # next trial
+            return True
         else:
-            logging.error(
-                "%s: com.victronenergy.settings not found. Exiting."
-                % (dt.now()).strftime("%c")
-            )
+            logging.error("%s: com.victronenergy.settings not found. Exiting." % (dt.now()).strftime("%c"))
             sys.exit()
 
     # #####################################################################
@@ -331,56 +310,77 @@ class DbusAggBatService(object):
     # #####################################################################
 
     def _find_batteries(self):
-        self._batteries_dict = {}  # Marvo2011
-        self._smartShunt_list = [] # SmartShunt list - will be populated so battery category SmartShunts are at the beginning of the list
-        self._num_battery_shunts = 0 # no SmartShunts in the battery category have been found yet
+        self._batteries_dict = {}
+
+        # SmartShunt list - will be populated so battery category SmartShunts are at the beginning of the list
+        self._smartShunt_list = []
+
+        # no SmartShunts in the battery category have been found yet
+        self._num_battery_shunts = 0
         batteriesCount = 0
+
         # the following two variables are used when self._ownCharge (read from
         # the charge file), is negative
-        Soc = 0 # to accumulate the SoC of the aggregated batteries from their BMSes
-        InstalledCapacity = 0 # to accumulate the overall capacity of the aggregated batteries from their BMSes
+        # to accumulate the SoC of the aggregated batteries from their BMSes
+        Soc = 0
+
+        # to accumulate the overall capacity of the aggregated batteries from their BMSes
+        InstalledCapacity = 0
+
         ##################################################
         # Logic to interpret the USE_SMARTSHUNTS setting #
         ##################################################
         use_smartshunts = False
-        included_smartshunts = [] # list to keep track of which SmartShunts have been included to not match the same shunt twice and to make sure the correct number is matched
-        NR_OF_SMARTSHUNTS = 0 # need to find >= 0 NR_OF_SMARTSHUNTS
+
+        # list to keep track of which SmartShunts have been included to not match the same shunt twice and
+        # to make sure the correct number is matched
+        included_smartshunts = []
+
+        # need to find >= 0 NR_OF_SMARTSHUNTS
+        NR_OF_SMARTSHUNTS = 0
+
         if isinstance(settings.USE_SMARTSHUNTS, bool):
-            use_smartshunts = settings.USE_SMARTSHUNTS # True: use all available SmartShunts, False: don't use any SmartShunt
+            # True: use all available SmartShunts, False: don't use any SmartShunt
+            use_smartshunts = settings.USE_SMARTSHUNTS
         elif isinstance(settings.USE_SMARTSHUNTS, (list, tuple)):
-            use_smartshunts = (len(settings.USE_SMARTSHUNTS) > 0) # empty list -> don't use any SmartShunt
+            # empty list -> don't use any SmartShunt
+            use_smartshunts = len(settings.USE_SMARTSHUNTS) > 0
+
             if use_smartshunts:
-                NR_SMARTSHUNTS = len(settings.USE_SMARTSHUNTS) # NR_SMARTSHUNTS is the number of SmartShunts specified by the user
-            included_smartshunts = [False] * NR_SMARTSHUNTS # initially, no SmartShunt has been found yet
+                # NR_SMARTSHUNTS is the number of SmartShunts specified by the user
+                NR_SMARTSHUNTS = len(settings.USE_SMARTSHUNTS)
+
+            # initially, no SmartShunt has been found yet
+            included_smartshunts = [False] * NR_SMARTSHUNTS
+
         productName = ""
-        shuntName = "" # keep track of SmartShunt (user-defined) name as specified by SMARTSHUNT_INSTANCE_NAME_PATH
-        logging.info(
-            "%s: Searching batteries: Trial Nr. %d"
-            % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
-        )
-        try:  # if Dbus monitor not running yet, new trial instead of exception
+
+        # keep track of SmartShunt (user-defined) name as specified by SMARTSHUNT_INSTANCE_NAME_PATH
+        shuntName = ""
+        logging.info("%s: Searching batteries: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
+
+        # if Dbus monitor not running yet, new trial instead of exception
+        try:
             for service in self._dbusConn.list_names():
                 if "com.victronenergy" in service:
                     logging.info("%s: Dbusmonitor sees: %s" % ((dt.now()).strftime("%c"), service))
-                battery_service = (settings.BATTERY_SERVICE_NAME in service) # Current device is in Victron "battery" service
-                dcload_service  = (settings.DCLOAD_SERVICE_NAME in service)  # Current device is in Victron "dcload" service (i.e. a SmartShunt set to DC metering)
+                # Current device is in Victron "battery" service
+                battery_service = settings.BATTERY_SERVICE_NAME in service
+                # Current device is in Victron "dcload" service (i.e. a SmartShunt set to DC metering)
+                dcload_service = settings.DCLOAD_SERVICE_NAME in service
                 if battery_service or dcload_service:
-                    productName = self._dbusMon.dbusmon.get_value(
-                        service, settings.BATTERY_PRODUCT_NAME_PATH
-                    )
-                    shuntName  = self._dbusMon.dbusmon.get_value(
-                        service, settings.SMARTSHUNT_INSTANCE_NAME_PATH
-                    )
+                    productName = self._dbusMon.dbusmon.get_value(service, settings.BATTERY_PRODUCT_NAME_PATH)
+                    shuntName = self._dbusMon.dbusmon.get_value(service, settings.SMARTSHUNT_INSTANCE_NAME_PATH)
                 if battery_service:
-                    if (productName != None) and (settings.BATTERY_PRODUCT_NAME in productName):
+                    if (productName is not None) and (settings.BATTERY_PRODUCT_NAME in productName):
                         logging.info("%s: Correct battery product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
-                        # Custom name, if exists, Marvo2011
+
+                        # Custom name, if exists
                         try:
-                            BatteryName = self._dbusMon.dbusmon.get_value(
-                                service, settings.BATTERY_INSTANCE_NAME_PATH
-                            )
+                            BatteryName = self._dbusMon.dbusmon.get_value(service, settings.BATTERY_INSTANCE_NAME_PATH)
                         except Exception:
                             BatteryName = "Battery%d" % (batteriesCount + 1)
+
                         # Check if all batteries have custom names
                         if BatteryName in self._batteries_dict:
                             BatteryName = "%s%d" % (BatteryName, batteriesCount + 1)
@@ -390,35 +390,24 @@ class DbusAggBatService(object):
                             "%s: %s found, named as: %s."
                             % (
                                 (dt.now()).strftime("%c"),
-                                (
-                                    self._dbusMon.dbusmon.get_value(
-                                        service, "/ProductName"
-                                    )
-                                ),
-                                BatteryName
+                                (self._dbusMon.dbusmon.get_value(service, "/ProductName")),
+                                BatteryName,
                             )
                         )
 
                         batteriesCount += 1
+
                         # accumulate battery capacities and Soc if not read from charge file
                         if self._ownCharge < 0:
-                            battery_capacity = self._dbusMon.dbusmon.get_value(
-                                service, "/InstalledCapacity"
-                            )
-                            battery_soc = self._dbusMon.dbusmon.get_value(
-                                service, "/Soc"
-                            ) * battery_capacity
+                            battery_capacity = self._dbusMon.dbusmon.get_value(service, "/InstalledCapacity")
+                            battery_soc = self._dbusMon.dbusmon.get_value(service, "/Soc") * battery_capacity
                             InstalledCapacity += battery_capacity
                             Soc += battery_soc
-                            logging.info(
-                                "%s SoC: %f / %f Ah" % (BatteryName, battery_soc / 100.0, battery_capacity)
-                            )
+                            logging.info("%s SoC: %f / %f Ah" % (BatteryName, battery_soc / 100.0, battery_capacity))
 
                         # Create voltage paths with battery names
                         if settings.SEND_CELL_VOLTAGES == 1:
-                            for cellId in range(
-                                1, (settings.NR_OF_CELLS_PER_BATTERY) + 1
-                            ):
+                            for cellId in range(1, (settings.NR_OF_CELLS_PER_BATTERY) + 1):
                                 self._dbusservice.add_path(
                                     "/Voltages/%s_Cell%d"
                                     % (
@@ -430,112 +419,129 @@ class DbusAggBatService(object):
                                     gettextcallback=lambda a, x: "{:.3f}V".format(x),
                                 )
 
-                        
                         # Check if Nr. of cells is equal
-                        if (
-                            self._dbusMon.dbusmon.get_value(
-                                service, "/System/NrOfCellsPerBattery"
-                            )
-                            != settings.NR_OF_CELLS_PER_BATTERY
-                        ):
-                            logging.error(
-                                "%s: Number of cells of batteries is not correct. Exiting."
-                                % (dt.now()).strftime("%c")
-                            )
+                        if self._dbusMon.dbusmon.get_value(service, "/System/NrOfCellsPerBattery") != settings.NR_OF_CELLS_PER_BATTERY:
+                            logging.error("%s: Number of cells of batteries is not correct. Exiting." % (dt.now()).strftime("%c"))
                             sys.exit()
 
-                        # end of section, Marvo2011
-                
+                        # end of section
+
                 ##########################################################
                 # Find SmartShunts in either Battery or DC Load services #
                 ##########################################################
                 if battery_service or dcload_service:
-                    if (
-                        (productName != None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName)
-                    ):  # if SmartShunt found, can be used for battery monitoring or DC load current depending on how it is set
-                        shunt_vrm_id = self._dbusMon.dbusmon.get_value(
-                             service, "/DeviceInstance"
-                        )
-                        logging.info(
-                            "%s: Correct SmartShunt product name %s found in the service %s"
-                            % ((dt.now()).strftime("%c"), productName, service)
-                        )
-                        if use_smartshunts: # user specified to use SmartShunts
-                            include_shunt = True # if USE_SMARTSHUNTS is set to `True` and not a list, the conditional below won't run and every SmartShunt is included
-                            if isinstance(settings.USE_SMARTSHUNTS, (list, tuple)): # user-specified list of SmartShunts
-                                for shunt_id in range(0, len(settings.USE_SMARTSHUNTS)): # go over user-list and see if we can match current shunt
-                                    if included_smartshunts[shunt_id]: # already included, move along
+                    # if SmartShunt found, can be used for battery monitoring or DC load current
+                    # depending on how it is set
+                    if (productName is not None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName):
+                        shunt_vrm_id = self._dbusMon.dbusmon.get_value(service, "/DeviceInstance")
+                        logging.info("%s: Correct SmartShunt product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
+
+                        # user specified to use SmartShunts
+                        if use_smartshunts:
+                            # if USE_SMARTSHUNTS is set to `True` and not a list, the conditional below won't
+                            # run and every SmartShunt is included
+                            include_shunt = True
+
+                            # user-specified list of SmartShunts
+                            if isinstance(settings.USE_SMARTSHUNTS, (list, tuple)):
+                                # go over user-list and see if we can match current shunt
+                                for shunt_id in range(0, len(settings.USE_SMARTSHUNTS)):
+                                    # already included, move along
+                                    if included_smartshunts[shunt_id]:
                                         continue
-                                    if isinstance(settings.USE_SMARTSHUNTS[shunt_id], int): # match by VRM Id
-                                        include_shunt = (settings.USE_SMARTSHUNTS[shunt_id] == shunt_vrm_id)
-                                    elif isinstance(settings.USE_SMARTSHUNTS[shunt_id], str): # match by shuntName (as specified in the SMARTSHUNT_INSTANCE_NAME_PATH field)
-                                        include_shunt = (settings.USE_SMARTSHUNTS[shunt_id] == shuntName)
-                                    else: # Bail out with an error if list entry is neither string integer nor string
+
+                                    # match by VRM Id
+                                    if isinstance(settings.USE_SMARTSHUNTS[shunt_id], int):
+                                        include_shunt = settings.USE_SMARTSHUNTS[shunt_id] == shunt_vrm_id
+
+                                    # match by shuntName (as specified in the SMARTSHUNT_INSTANCE_NAME_PATH field)
+                                    elif isinstance(settings.USE_SMARTSHUNTS[shunt_id], str):
+                                        include_shunt = settings.USE_SMARTSHUNTS[shunt_id] == shuntName
+
+                                    # Bail out with an error if list entry is neither string integer nor string
+                                    else:
                                         logging.error(
-                                            "%s: Bad element #%d in \"%s\" in USE_SMARTSHUNTS list. Entries need to be VRM instance numbers or Name strings. Exiting."
-                                            % (dt.now()).strftime("%c"), shunt_id+1, settings.USE_SMARTSHUNTS[shunt_id]
+                                            '%s: Bad element #%d in "%s" in USE_SMARTSHUNTS list. Entries need to be '
+                                            + " VRM instance numbers or Name strings. Exiting." % (dt.now()).strftime("%c"),
+                                            shunt_id + 1,
+                                            settings.USE_SMARTSHUNTS[shunt_id],
                                         )
                                         sys.exit()
-                                    if include_shunt: # if a shunt has been matched as one the user defined and we haven't included it yet, we can get out of this loop
+
+                                    # if a shunt has been matched as one the user defined and we haven't included it
+                                    # yet, we can get out of this loop
+                                    if include_shunt:
                                         break
-                            if include_shunt: # SmartShunt is added to list
-                                if battery_service: # battery SmartShunts are inserted at the end of the battery part of the list
+
+                            # SmartShunt is added to list
+                            if include_shunt:
+                                # battery SmartShunts are inserted at the end of the battery part of the list
+                                if battery_service:
                                     self._smartShunt_list.insert(self._num_battery_shunts, service)
                                     self._num_battery_shunts += 1
-                                else: # dcload SmartShunts get added to the end of the list (which is the end of the dcload part of the list)
+                                # dcload SmartShunts get added to the end of the list
+                                # (which is the end of the dcload part of the list)
+                                else:
                                     self._smartShunt_list.append(service)
                                 logging.info(
                                     "%s: %s [%d] added, named as: %s."
-                                    % ((dt.now()).strftime("%c"), productName, shunt_vrm_id, shuntName)
+                                    % (
+                                        (dt.now()).strftime("%c"),
+                                        productName,
+                                        shunt_vrm_id,
+                                        shuntName,
+                                    )
                                 )
                 # end of SmartShunt detection (AT, 2025)
 
         except Exception:
             pass
+
         # when SmartShunts have been found, add their overall number in addition to
         # the number of batteries aggregated to the log output
         if len(self._smartShunt_list) > 0:
             logging.info(
                 "%s: %d batteries and %d SmartShunts found."
-                % ((dt.now()).strftime("%c"), batteriesCount, len(self._smartShunt_list))
+                % (
+                    (dt.now()).strftime("%c"),
+                    batteriesCount,
+                    len(self._smartShunt_list),
+                )
             )
         else:
-            logging.info(
-                "%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount)
-            )
+            logging.info("%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount))
 
-        if (
-            (batteriesCount == settings.NR_OF_BATTERIES) and
-            (len(self._smartShunt_list) >= NR_OF_SMARTSHUNTS)
-           ): # make sure the correct number of batteries and SmartShunts has been found
+        # make sure the correct number of batteries and SmartShunts has been found
+        if (batteriesCount == settings.NR_OF_BATTERIES) and (len(self._smartShunt_list) >= NR_OF_SMARTSHUNTS):
             if self._ownCharge < 0:
                 self._ownCharge = Soc
                 Soc /= InstalledCapacity
             if settings.CURRENT_FROM_VICTRON:
                 self._searchTrials = 0
-                GLib.timeout_add(
-                    1000, self._find_multis
-                )  # if current from Victron stuff search multi/quattro on DBus
+                # if current from Victron stuff search multi/quattro on DBus
+                GLib.timeout_add(1000, self._find_multis)
             else:
                 self._timeOld = tt.time()
-                GLib.timeout_add(
-                    1000, self._update
-                )  # if current from BMS start the _update loop
-            return False  # all OK, stop calling this function
-        elif self._searchTrials < settings.SEARCH_TRIALS: # if the correct number has not been found yet, repeat until SEARCH_TRIALS is reached
+                # if current from BMS start the _update loop
+                GLib.timeout_add(1000, self._update)
+
+            # all OK, stop calling this function
+            return False
+        # if the correct number has not been found yet, repeat until SEARCH_TRIALS is reached
+        elif self._searchTrials < settings.SEARCH_TRIALS:
             self._searchTrials += 1
-            return True  # next trial
-        else: # bail out if correct number of batteries and SmartShunts can not be found after SEARCH_TRIALS tries
-            if (NR_OF_SMARTSHUNTS > 0):
+            # next trial
+            return True
+        # bail out if correct number of batteries and SmartShunts can not be found after SEARCH_TRIALS tries
+        else:
+            if NR_OF_SMARTSHUNTS > 0:
                 logging.error(
-                    "%s: Required number of batteries (%d) or SmartShunts (%d) not found. Exiting."
-                    % (dt.now()).strftime("%c"), settings.NR_OF_BATTERIES, NR_OF_SMARTSHUNTS
+                    "%s: Required number of batteries (%d) or SmartShunts (%d) not found. Exiting." % (dt.now()).strftime("%c"),
+                    settings.NR_OF_BATTERIES,
+                    NR_OF_SMARTSHUNTS,
                 )
             else:
-                logging.error(
-                    "%s: Required number of batteries not found. Exiting."
-                    % (dt.now()).strftime("%c")
-                )
+                logging.error("%s: Required number of batteries not found. Exiting." % (dt.now()).strftime("%c"))
             sys.exit()
 
     # #########################################################################
@@ -550,10 +556,7 @@ class DbusAggBatService(object):
         # - current detection of Multi/Quattro is not wanted (i.e. SmartShunts are used instead)
         # may still want to aggregate their batteries when using no inverter/no Victron inverter/charger)
         if len(settings.MULTI_KEY_WORD) > 0:
-            logging.info(
-                "%s: Searching Multi/Quattro VEbus: Trial Nr. %d"
-                % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
-            )
+            logging.info("%s: Searching Multi/Quattro VEbus: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
             try:
                 for service in self._dbusConn.list_names():
                     if settings.MULTI_KEY_WORD in service:
@@ -571,25 +574,23 @@ class DbusAggBatService(object):
             if self._multi is None:
                 if self._searchTrials < settings.SEARCH_TRIALS:
                     self._searchTrials += 1
-                    return True  # next trial
+                    # next trial
+                    return True
                 else:
-                    logging.error(
-                        "%s: Multi/Quattro not found. Exiting." % (dt.now()).strftime("%c")
-                    )
+                    logging.error("%s: Multi/Quattro not found. Exiting." % (dt.now()).strftime("%c"))
                     sys.exit()
 
         if settings.NR_OF_MPPTS > 0:
             self._searchTrials = 0
-            GLib.timeout_add(
-                1000, self._find_mppts
-            )  # search MPPTs on DBus if present
+            # search MPPTs on DBus if present
+            GLib.timeout_add(1000, self._find_mppts)
         else:
             self._timeOld = tt.time()
-            GLib.timeout_add(
-                1000, self._update
-            )  # if no MPPTs start the _update loop
-        return False  # all OK, stop calling this function
+            # if no MPPTs start the _update loop
+            GLib.timeout_add(1000, self._update)
 
+        # all OK, stop calling this function
+        return False
 
     # ############################################################
     # ############################################################
@@ -600,10 +601,7 @@ class DbusAggBatService(object):
     def _find_mppts(self):
         self._mppts_list = []
         mpptsCount = 0
-        logging.info(
-            "%s: Searching MPPTs: Trial Nr. %d"
-            % ((dt.now()).strftime("%c"), (self._searchTrials + 1))
-        )
+        logging.info("%s: Searching MPPTs: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
         try:
             for service in self._dbusConn.list_names():
                 if settings.MPPT_KEY_WORD in service:
@@ -623,15 +621,14 @@ class DbusAggBatService(object):
         if mpptsCount == settings.NR_OF_MPPTS:
             self._timeOld = tt.time()
             GLib.timeout_add(1000, self._update)
-            return False  # all OK, stop calling this function
+            # all OK, stop calling this function
+            return False
         elif self._searchTrials < settings.SEARCH_TRIALS:
             self._searchTrials += 1
-            return True  # next trial
+            # next trial
+            return True
         else:
-            logging.error(
-                "%s: Required number of MPPTs not found. Exiting."
-                % (dt.now()).strftime("%c")
-            )
+            logging.error("%s: Required number of MPPTs not found. Exiting." % (dt.now()).strftime("%c"))
             sys.exit()
 
     # #################################################################################
@@ -656,26 +653,28 @@ class DbusAggBatService(object):
 
         # Temperature
         Temperature = 0
-        MaxCellTemp_list = []  # list, maxima of all physical batteries
-        MinCellTemp_list = []  # list, minima of all physical batteries
+        # list, maxima of all physical batteries
+        MaxCellTemp_list = []
+        # list, minima of all physical batteries
+        MinCellTemp_list = []
 
         # Extras
         cellVoltages_dict = {}
-        MaxCellVoltage_dict = (
-            {}
-        )  # dictionary {'ID' : MaxCellVoltage, ... } for all physical batteries
-        MinCellVoltage_dict = (
-            {}
-        )  # dictionary {'ID' : MinCellVoltage, ... } for all physical batteries
+        # dictionary {'ID' : MaxCellVoltage, ... } for all physical batteries
+        MaxCellVoltage_dict = {}
+        # dictionary {'ID' : MinCellVoltage, ... } for all physical batteries
+        MinCellVoltage_dict = {}
         NrOfModulesOnline = 0
         NrOfModulesOffline = 0
         NrOfModulesBlockingCharge = 0
         NrOfModulesBlockingDischarge = 0
-        VoltagesSum_dict = {}  # battery voltages from sum of cells, Marvo2011
+        # battery voltages from sum of cells
+        VoltagesSum_dict = {}
         chargeVoltageReduced_list = []
 
         # Alarms
-        LowVoltage_alarm_list = []  # lists to find maxima
+        # lists to find maxima
+        LowVoltage_alarm_list = []
         HighVoltage_alarm_list = []
         LowCellVoltage_alarm_list = []
         LowSoc_alarm_list = []
@@ -690,260 +689,143 @@ class DbusAggBatService(object):
         BmsCable_alarm_list = []
 
         # Charge/discharge parameters
-        MaxChargeCurrent_list = (
-            []
-        )  # the minimum of MaxChargeCurrent * NR_OF_BATTERIES to be transmitted
-        MaxDischargeCurrent_list = (
-            []
-        )  # the minimum of MaxDischargeCurrent * NR_OF_BATTERIES to be transmitted
-        MaxChargeVoltage_list = (
-            []
-        )  # if some cells are above MAX_CELL_VOLTAGE, store here the sum of differences for each battery
-        AllowToCharge_list = []  # minimum of all to be transmitted
-        AllowToDischarge_list = []  # minimum of all to be transmitted
-        AllowToBalance_list = []  # minimum of all to be transmitted
-        ChargeMode_list = []  # Bulk, Absorption, Float, Keep always max voltage
+
+        # the minimum of MaxChargeCurrent * NR_OF_BATTERIES to be transmitted
+        MaxChargeCurrent_list = []
+        # the minimum of MaxDischargeCurrent * NR_OF_BATTERIES to be transmitted
+        MaxDischargeCurrent_list = []
+        # if some cells are above MAX_CELL_VOLTAGE, store here the sum of differences for each battery
+        MaxChargeVoltage_list = []
+        # minimum of all to be transmitted
+        AllowToCharge_list = []
+        # minimum of all to be transmitted
+        AllowToDischarge_list = []
+        # minimum of all to be transmitted
+        AllowToBalance_list = []
+        # Bulk, Absorption, Float, Keep always max voltage
+        ChargeMode_list = []
 
         ####################################################
         # Get DBus values from all SerialBattery instances #
         ####################################################
 
         try:
-            for i in self._batteries_dict:  # Marvo2011
+            for i in self._batteries_dict:
 
                 # DC
-                step = "Read V, I, P"  # to detect error
-                Voltage += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/Dc/0/Voltage"
-                )
-                Current += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/Dc/0/Current"
-                )
-                Power += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/Dc/0/Power"
-                )
+                # to detect error
+                step = "Read V, I, P"
+                Voltage += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
+                Current += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
+                Power += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
 
                 # Capacity
                 step = "Read and calculate capacity, SoC, Time to go"
-                InstalledCapacity += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/InstalledCapacity"
-                )
+                InstalledCapacity += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
 
                 if not settings.OWN_SOC:
-                    ConsumedAmphours += self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/ConsumedAmphours"
-                    )
-                    Capacity += self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Capacity"
-                    )
-                    Soc += self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Soc"
-                    ) * self._dbusMon.dbusmon.get_value(
+                    ConsumedAmphours += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/ConsumedAmphours")
+                    Capacity += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Capacity")
+                    Soc += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Soc") * self._dbusMon.dbusmon.get_value(
                         self._batteries_dict[i], "/InstalledCapacity"
                     )
-                    ttg = self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/TimeToGo"
-                    )
+                    ttg = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/TimeToGo")
                     if (ttg is not None) and (TimeToGo is not None):
-                        TimeToGo += ttg * self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/InstalledCapacity"
-                        )
+                        TimeToGo += ttg * self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
                     else:
                         TimeToGo = None
 
                 # Temperature
                 step = "Read temperatures"
-                Temperature += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/Dc/0/Temperature"
-                )
-                MaxCellTemp_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/System/MaxCellTemperature"
-                    )
-                )
-                MinCellTemp_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/System/MinCellTemperature"
-                    )
-                )
+                Temperature += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Temperature")
+                MaxCellTemp_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxCellTemperature"))
+                MinCellTemp_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinCellTemperature"))
 
                 # Cell voltages
-                step = "Read max. and min cell voltages and voltage sum"  # cell ID : its voltage
+                # cell ID : its voltage
+                step = "Read max. and min cell voltages and voltage sum"
                 MaxCellVoltage_dict[
                     "%s_%s"
                     % (
                         i,
-                        self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/System/MaxVoltageCellId"
-                        ),
+                        self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxVoltageCellId"),
                     )
-                ] = self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/System/MaxCellVoltage"
-                )
+                ] = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxCellVoltage")
                 MinCellVoltage_dict[
                     "%s_%s"
                     % (
                         i,
-                        self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/System/MinVoltageCellId"
-                        ),
+                        self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinVoltageCellId"),
                     )
-                ] = self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/System/MinCellVoltage"
-                )
+                ] = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinCellVoltage")
 
-                 # here an exception is raised and new read trial initiated if None is on Dbus
+                # here an exception is raised and new read trial initiated if None is on Dbus
                 volt_sum_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Sum")
-                if volt_sum_get != None:
+                if volt_sum_get is not None:
                     VoltagesSum_dict[i] = volt_sum_get
                 else:
-                    raise TypeError(f"Battery {i} returns None value of /Voltages/Sum. Please check, if the setting 'BATTERY_CELL_DATA_FORMAT=1' in dbus-serialbattery config.")
+                    raise TypeError(
+                        f"Battery {i} returns None value of /Voltages/Sum. Please check, if the setting "
+                        + "'BATTERY_CELL_DATA_FORMAT=1' in dbus-serialbattery config."
+                    )
 
                 # Battery state
                 step = "Read battery state"
-                NrOfModulesOnline += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/System/NrOfModulesOnline"
-                )
-                NrOfModulesOffline += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/System/NrOfModulesOffline"
-                )
-                NrOfModulesBlockingCharge += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/System/NrOfModulesBlockingCharge"
-                )
-                NrOfModulesBlockingDischarge += self._dbusMon.dbusmon.get_value(
-                    self._batteries_dict[i], "/System/NrOfModulesBlockingDischarge"
-                )  # sum of modules blocking discharge
+                NrOfModulesOnline += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/NrOfModulesOnline")
+                NrOfModulesOffline += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/NrOfModulesOffline")
+                NrOfModulesBlockingCharge += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/NrOfModulesBlockingCharge")
+                # sum of modules blocking discharge
+                NrOfModulesBlockingDischarge += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/NrOfModulesBlockingDischarge")
 
                 step = "Read cell voltages"
-                for j in range(settings.NR_OF_CELLS_PER_BATTERY):  # Marvo2011
-                    cellVoltages_dict["%s_Cell%d" % (i, j + 1)] = (
-                        self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/Voltages/Cell%d" % (j + 1)
-                        )
-                    )
+                for j in range(settings.NR_OF_CELLS_PER_BATTERY):
+                    cellVoltages_dict["%s_Cell%d" % (i, j + 1)] = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Cell%d" % (j + 1))
 
                 # Alarms
                 step = "Read alarms"
-                LowVoltage_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/LowVoltage"
-                    )
-                )
-                HighVoltage_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/HighVoltage"
-                    )
-                )
-                LowCellVoltage_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/LowCellVoltage"
-                    )
-                )
-                LowSoc_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/LowSoc"
-                    )
-                )
-                HighChargeCurrent_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/HighChargeCurrent"
-                    )
-                )
-                HighDischargeCurrent_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/HighDischargeCurrent"
-                    )
-                )
-                CellImbalance_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/CellImbalance"
-                    )
-                )
-                InternalFailure_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/InternalFailure_alarm"
-                    )
-                )
-                HighChargeTemperature_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/HighChargeTemperature"
-                    )
-                )
-                LowChargeTemperature_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/LowChargeTemperature"
-                    )
-                )
-                HighTemperature_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/HighTemperature"
-                    )
-                )
-                LowTemperature_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/LowTemperature"
-                    )
-                )
-                BmsCable_alarm_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Alarms/BmsCable"
-                    )
-                )
+                LowVoltage_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowVoltage"))
+                HighVoltage_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighVoltage"))
+                LowCellVoltage_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowCellVoltage"))
+                LowSoc_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowSoc"))
+                HighChargeCurrent_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighChargeCurrent"))
+                HighDischargeCurrent_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighDischargeCurrent"))
+                CellImbalance_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/CellImbalance"))
+                InternalFailure_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/InternalFailure_alarm"))
+                HighChargeTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighChargeTemperature"))
+                LowChargeTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowChargeTemperature"))
+                HighTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighTemperature"))
+                LowTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowTemperature"))
+                BmsCable_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/BmsCable"))
 
-                if (
-                    settings.OWN_CHARGE_PARAMETERS
-                ):  # calculate reduction of charge voltage as sum of overvoltages of all cells
+                # calculate reduction of charge voltage as sum of overvoltages of all cells
+                if settings.OWN_CHARGE_PARAMETERS:
                     step = "Calculate CVL reduction"
                     cellOvervoltage = 0
-                    for j in range(settings.NR_OF_CELLS_PER_BATTERY):  # Marvo2011
-                        cellVoltage = self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/Voltages/Cell%d" % (j + 1)
-                        )
+                    for j in range(settings.NR_OF_CELLS_PER_BATTERY):
+                        cellVoltage = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Cell%d" % (j + 1))
                         if cellVoltage > settings.MAX_CELL_VOLTAGE:
                             cellOvervoltage += cellVoltage - settings.MAX_CELL_VOLTAGE
-                    chargeVoltageReduced_list.append(
-                        VoltagesSum_dict[i] - cellOvervoltage
-                    )
+                    chargeVoltageReduced_list.append(VoltagesSum_dict[i] - cellOvervoltage)
 
-                else:  # Aggregate charge/discharge parameters
+                # Aggregate charge/discharge parameters
+                else:
                     step = "Read charge parameters"
-                    MaxChargeCurrent_list.append(
-                        self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/Info/MaxChargeCurrent"
-                        )
-                    )  # list of max. charge currents to find minimum
-                    MaxDischargeCurrent_list.append(
-                        self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/Info/MaxDischargeCurrent"
-                        )
-                    )  # list of max. discharge currents  to find minimum
-                    MaxChargeVoltage_list.append(
-                        self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/Info/MaxChargeVoltage"
-                        )
-                    )  # list of max. charge voltages  to find minimum
-                    ChargeMode_list.append(
-                        self._dbusMon.dbusmon.get_value(
-                            self._batteries_dict[i], "/Info/ChargeMode"
-                        )
-                    )  # list of charge modes of batteries (Bulk, Absorption, Float, Keep always max voltage)
+                    # list of max. charge currents to find minimum
+                    MaxChargeCurrent_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeCurrent"))
+                    # list of max. discharge currents  to find minimum
+                    MaxDischargeCurrent_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxDischargeCurrent"))
+                    # list of max. charge voltages  to find minimum
+                    MaxChargeVoltage_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeVoltage"))
+                    # list of charge modes of batteries (Bulk, Absorption, Float, Keep always max voltage)
+                    ChargeMode_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/ChargeMode"))
 
                 step = "Read Allow to"
-                AllowToCharge_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Io/AllowToCharge"
-                    )
-                )  # list of AllowToCharge to find minimum
-                AllowToDischarge_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Io/AllowToDischarge"
-                    )
-                )  # list of AllowToDischarge to find minimum
-                AllowToBalance_list.append(
-                    self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/Io/AllowToBalance"
-                    )
-                )  # list of AllowToBalance to find minimum
+                # list of AllowToCharge to find minimum
+                AllowToCharge_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Io/AllowToCharge"))
+                # list of AllowToDischarge to find minimum
+                AllowToDischarge_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Io/AllowToDischarge"))
+                # list of AllowToBalance to find minimum
+                AllowToBalance_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Io/AllowToBalance"))
 
             step = "Find max. and min. cell voltage of all batteries"
             # placed in try-except structure for the case if some values are of None.
@@ -959,12 +841,11 @@ class DbusAggBatService(object):
             logging.error("Occured during step %s, Battery %s." % (step, i))
             logging.error("Read trial nr. %d" % self._readTrials)
             if self._readTrials > settings.READ_TRIALS:
-                logging.error(
-                    "%s: DBus read failed. Exiting." % (dt.now()).strftime("%c")
-                )
+                logging.error("%s: DBus read failed. Exiting." % (dt.now()).strftime("%c"))
                 sys.exit()
             else:
-                return True  # next call allowed
+                # next call allowed
+                return True
 
         #####################################################
         # Process collected values (except of dictionaries) #
@@ -973,9 +854,7 @@ class DbusAggBatService(object):
         # averaging
         Voltage = Voltage / settings.NR_OF_BATTERIES
         Temperature = Temperature / settings.NR_OF_BATTERIES
-        VoltagesSum = (
-            sum(VoltagesSum_dict.values()) / settings.NR_OF_BATTERIES
-        )  # Marvo2011
+        VoltagesSum = sum(VoltagesSum_dict.values()) / settings.NR_OF_BATTERIES
 
         # find max and min cell temperature (have no ID)
         MaxCellTemp = self._fn._max(MaxCellTemp_list)
@@ -1000,17 +879,13 @@ class DbusAggBatService(object):
         if not settings.OWN_CHARGE_PARAMETERS:
             if settings.KEEP_MAX_CVL and any("Float" in item for item in ChargeMode_list):
                 MaxChargeVoltage = self._fn._max(MaxChargeVoltage_list)
-                    
+
             else:
                 MaxChargeVoltage = self._fn._min(MaxChargeVoltage_list)
-                
-            MaxChargeCurrent = (
-                self._fn._min(MaxChargeCurrent_list) * settings.NR_OF_BATTERIES
-            )
-            
-            MaxDischargeCurrent = (
-                self._fn._min(MaxDischargeCurrent_list) * settings.NR_OF_BATTERIES
-            )
+
+            MaxChargeCurrent = self._fn._min(MaxChargeCurrent_list) * settings.NR_OF_BATTERIES
+
+            MaxDischargeCurrent = self._fn._min(MaxDischargeCurrent_list) * settings.NR_OF_BATTERIES
 
         AllowToCharge = self._fn._min(AllowToCharge_list)
         AllowToDischarge = self._fn._min(AllowToDischarge_list)
@@ -1022,45 +897,47 @@ class DbusAggBatService(object):
 
         if settings.CURRENT_FROM_VICTRON:
             success = True
-            Current_VE = 0 # variable to accumulate currents measured by Victron stuff (i.e. Multi/Quattro, SmartShunts, MPPTs)
+            # variable to accumulate currents measured by Victron stuff (i.e. Multi/Quattro, SmartShunts, MPPTs)
+            Current_VE = 0
             try:
-                if self._multi is not None: # Read Multi/Quattro data only when one is used and has been found
-                    # Multi/Quattro `Connected` value will go to 0 if it exists but is switch off (VE-BUS remains connected)
-                    # by the user (either via Digital Multi Control, Cerbo, VRM, or the device itself)
-                    Multi_Connected = self._dbusMon.dbusmon.get_value(
-                        self._multi, "/Connected"
-                    )
-                    if Multi_Connected > 0: # Read current only when Multi/Quattro is connected
-                        Current_VE = self._dbusMon.dbusmon.get_value(
-                            self._multi, "/Dc/0/Current"
-                        )  # get DC current of multi/quattro (or system of them)
-                        if not self._multi_connected: # Output to log that Multi/Quattro is connected again
+                # Read Multi/Quattro data only when one is used and has been found
+                # Multi/Quattro `Connected` value will go to 0 if it exists but is switch off (VE-BUS remains connected)
+                # by the user (either via Digital Multi Control, Cerbo, VRM, or the device itself)
+                if self._multi is not None:
+                    Multi_Connected = self._dbusMon.dbusmon.get_value(self._multi, "/Connected")
+                    # Read current only when Multi/Quattro is connected
+                    if Multi_Connected > 0:
+                        # get DC current of multi/quattro (or system of them)
+                        Current_VE = self._dbusMon.dbusmon.get_value(self._multi, "/Dc/0/Current")
+                        # Output to log that Multi/Quattro is connected again
+                        if not self._multi_connected:
                             logging.info("Multi/Quattro is connected.")
-                        self._multi_connected = True # keep track of state to notice if state changes at next round
+                        self._multi_connected = True  # keep track of state to notice if state changes at next round
                     else:
-                        if self._multi_connected: # Output to log when Multi/Quattro state changed from connected (at last read) to not connected
+                        # Output to log when Multi/Quattro state changed from connected (at last read) to not connected
+                        if self._multi_connected:
                             logging.info("Multi/Quattro is not connected.")
-                        self._multi_connected = False # keep track of state to notice if state changes at next round
+                        self._multi_connected = False  # keep track of state to notice if state changes at next round
 
                 for i in range(settings.NR_OF_MPPTS):
-                    Current_VE += self._dbusMon.dbusmon.get_value(
-                        self._mppts_list[i], "/Dc/0/Current"
-                    )  # add DC current of all MPPTs (if present)
-            
+                    # add DC current of all MPPTs (if present)
+                    Current_VE += self._dbusMon.dbusmon.get_value(self._mppts_list[i], "/Dc/0/Current")
+
             except Exception:
                 success = False
-                
+
             Current_SHUNTS = 0
             try:
-                for i in range(len(self._smartShunt_list)): # go over all SmartShunts
-                    shunt_current = self._dbusMon.dbusmon.get_value(
-                        self._smartShunt_list[i], "/Dc/0/Current"
-                    )
+                # go over all SmartShunts
+                for i in range(len(self._smartShunt_list)):
+                    shunt_current = self._dbusMon.dbusmon.get_value(self._smartShunt_list[i], "/Dc/0/Current")
                     if shunt_current is None:
                         raise ValueError(f"SmartShunt {self._smartShunt_list[i]} returns None as current.")
-                if i<self._num_battery_shunts: # SmartShunt is monitored as a battery
+                # SmartShunt is monitored as a battery
+                if i < self._num_battery_shunts:
                     Current_SHUNTS += shunt_current
-                else: # SmartShunt is in DC metering mode
+                # SmartShunt is in DC metering mode
+                else:
                     Current_SHUNTS -= shunt_current
             except Exception as err:
                 logging.error("%s: Error during SmartShunt polling: %s" % ((dt.now()).strftime("%c"), err))
@@ -1072,163 +949,144 @@ class DbusAggBatService(object):
                     if self._readTrials > settings.READ_TRIALS:
                         sys.exit()
                     else:
-                        return True  # next call allowed
+                        # next call allowed
+                        return True
 
             if success:
                 if settings.INVERT_SMARTSHUNTS:
                     Current_VE -= Current_SHUNTS
                 else:
                     Current_VE += Current_SHUNTS
-                Current = Current_VE  # BMS current overwritten only if no exception raised
-                Power = (
-                    Voltage * Current_VE
-                )  # calculate own power (not read from BMS)
+                # BMS current overwritten only if no exception raised
+                Current = Current_VE
+                # calculate own power (not read from BMS)
+                Power = Voltage * Current_VE
             else:
-                logging.error(
-                    "%s: Victron current reading error. Using BMS current and power instead."
-                    % (dt.now()).strftime("%c")
-                )  # the BMS values are not overwritten
-        
-        self._readTrials = 0  # must be reset after try-except of all reads
-        
+                # the BMS values are not overwritten
+                logging.error("%s: Victron current reading error. Using BMS current and power instead." % (dt.now()).strftime("%c"))
+
+        # must be reset after try-except of all reads
+        self._readTrials = 0
+
         ####################################################################################################
         # Calculate own charge/discharge parameters (overwrite the values received from the SerialBattery) #
         ####################################################################################################
 
         if settings.OWN_CHARGE_PARAMETERS:
-            CVL_NORMAL = (
-                settings.NR_OF_CELLS_PER_BATTERY
-                * settings.CHARGE_VOLTAGE_LIST[int((dt.now()).strftime("%m")) - 1]
-            )
-            CVL_BALANCING = (
-                settings.NR_OF_CELLS_PER_BATTERY * settings.BALANCING_VOLTAGE
-            )
+            CVL_NORMAL = settings.NR_OF_CELLS_PER_BATTERY * settings.CHARGE_VOLTAGE_LIST[int((dt.now()).strftime("%m")) - 1]
+            CVL_BALANCING = settings.NR_OF_CELLS_PER_BATTERY * settings.BALANCING_VOLTAGE
             ChargeVoltageBattery = CVL_NORMAL
 
-            time_unbalanced = (
-                int((dt.now()).strftime("%j")) - self._lastBalancing
-            )  # in days
+            # in days
+            time_unbalanced = int((dt.now()).strftime("%j")) - self._lastBalancing
             if time_unbalanced < 0:
-                time_unbalanced += 365  # year change
+                # year change
+                time_unbalanced += 365
 
-            if (
-                CVL_BALANCING > CVL_NORMAL
-            ):  # if the normal charging voltage is lower then 100% SoC
-                # manage balancing voltage
-                if (self._balancing == 0) and (
-                    time_unbalanced >= settings.BALANCING_REPETITION
-                ):
-                    self._balancing = 1  # activate increased CVL for balancing
-                    logging.info(
-                        "%s: CVL increase for balancing activated."
-                        % (dt.now()).strftime("%c")
-                    )
+            # if the normal charging voltage is lower then 100% SoC
+            # manage balancing voltage
+            if CVL_BALANCING > CVL_NORMAL:
+                if (self._balancing == 0) and (time_unbalanced >= settings.BALANCING_REPETITION):
+                    # activate increased CVL for balancing
+                    self._balancing = 1
+                    logging.info("%s: CVL increase for balancing activated." % (dt.now()).strftime("%c"))
 
                 if self._balancing == 1:
                     ChargeVoltageBattery = CVL_BALANCING
-                    if (Voltage >= CVL_BALANCING) and (
-                        (MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX
-                    ):
+                    if (Voltage >= CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX):
                         self._balancing = 2
-                        logging.info(
-                            "%s: Balancing goal reached." % (dt.now()).strftime("%c")
-                        )
+                        logging.info("%s: Balancing goal reached." % (dt.now()).strftime("%c"))
 
                 if self._balancing >= 2:
                     # keep balancing voltage at balancing day until decrease of solar powers and
                     ChargeVoltageBattery = CVL_BALANCING
-                    if Voltage <= CVL_NORMAL:  # the charge above "normal" is consumed
+                    # the charge above "normal" is consumed
+                    if Voltage <= CVL_NORMAL:
                         self._balancing = 0
                         self._lastBalancing = int((dt.now()).strftime("%j"))
                         self._lastBalancing_file = open(
-                            "/data/apps/dbus-aggregate-batteries/last_balancing", "w"
+                            "/data/apps/dbus-aggregate-batteries/last_balancing",
+                            "w",
                         )
                         self._lastBalancing_file.write("%s" % self._lastBalancing)
                         self._lastBalancing_file.close()
-                        logging.info(
-                            "%s: CVL increase for balancing de-activated."
-                            % (dt.now()).strftime("%c")
-                        )
+                        logging.info("%s: CVL increase for balancing de-activated." % (dt.now()).strftime("%c"))
 
                 if self._balancing == 0:
                     ChargeVoltageBattery = CVL_NORMAL
 
-            elif (
-                (time_unbalanced > 0)
-                and (Voltage >= CVL_BALANCING)
-                and ((MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX)
-            ):  # if normal charging voltage is 100% SoC and balancing is finished
-                logging.info(
-                    "%s: Balancing goal reached with full charging set as normal. Updating last_balancing file."
-                    % (dt.now()).strftime("%c")
-                )
+            # if normal charging voltage is 100% SoC and balancing is finished
+            elif (time_unbalanced > 0) and (Voltage >= CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX):
+                logging.info("%s: Balancing goal reached with full charging set as normal. Updating last_balancing file." % (dt.now()).strftime("%c"))
                 self._lastBalancing = int((dt.now()).strftime("%j"))
                 self._lastBalancing_file = open(
-                    "/data/apps/dbus-aggregate-batteries/last_balancing", "w"
+                    "/data/apps/dbus-aggregate-batteries/last_balancing",
+                    "w",
                 )
                 self._lastBalancing_file.write("%s" % self._lastBalancing)
                 self._lastBalancing_file.close()
 
             if Voltage >= CVL_BALANCING:
-                self._ownCharge = InstalledCapacity  # reset Coulumb counter to 100%
+                # reset Coulumb counter to 100%
+                self._ownCharge = InstalledCapacity
 
             # manage dynamic CVL reduction
             if MaxCellVoltage >= settings.MAX_CELL_VOLTAGE:
-                if not self._dynamicCVL: 
+                if not self._dynamicCVL:
                     self._dynamicCVL = True
                     logging.info(
-                        f"{(dt.now()).strftime('%c')}: Dynamic CVL reduction started due to max. cell voltage: {MaxVoltageCellId} {MaxCellVoltage:.3f}V."
+                        f"{(dt.now()).strftime('%c')}: Dynamic CVL reduction started due to max. cell voltage: " + f"{MaxVoltageCellId} {MaxCellVoltage:.3f}V."
                     )
-                    if not self._dynCVLactivated:       # avoid periodic readout  
+                    # avoid periodic readout
+                    if not self._dynCVLactivated:
                         self._dynCVLactivated = True
+                        # check if DC-feed enabled
                         self._DCfeedActive = self._dbusMon.dbusmon.get_value(
                             "com.victronenergy.settings",
                             "/Settings/CGwacs/OvervoltageFeedIn",
-                        )  # check if DC-feed enabled
+                        )
 
+                        # disable DC-coupled PV feed-in
                         self._dbusMon.dbusmon.set_value(
                             "com.victronenergy.settings",
                             "/Settings/CGwacs/OvervoltageFeedIn",
                             0,
-                        )  # disable DC-coupled PV feed-in
-                    
-                        if (self._DCfeedActive == 0):
-                            logging.info(
-                                f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in was not active.")
-                        else:    
-                            logging.info(
-                                f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in de-activated.")
- 
-                MaxChargeVoltage = min(
-                    (min(chargeVoltageReduced_list)), ChargeVoltageBattery
-                )  # avoid exceeding MAX_CELL_VOLTAGE
+                        )
+
+                        if self._DCfeedActive == 0:
+                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in was not active.")
+                        else:
+                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in de-activated.")
+
+                # avoid exceeding MAX_CELL_VOLTAGE
+                MaxChargeVoltage = min((min(chargeVoltageReduced_list)), ChargeVoltageBattery)
 
             else:
                 MaxChargeVoltage = ChargeVoltageBattery
 
                 if self._dynamicCVL:
                     self._dynamicCVL = False
-                    logging.info(
-                        "%s: Dynamic CVL reduction finished."
-                        % (dt.now()).strftime("%c")
-                    )
+                    logging.info("%s: Dynamic CVL reduction finished." % (dt.now()).strftime("%c"))
                     if (MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX:
+
+                        # re-enable DC-feed if it was enabled before
                         self._dbusMon.dbusmon.set_value(
                             "com.victronenergy.settings",
                             "/Settings/CGwacs/OvervoltageFeedIn",
                             self._DCfeedActive,
-                        )  # re-enable DC-feed if it was enabled before
+                        )
                         if self._DCfeedActive:
-                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in re-activated after succeeded balancing.")
+                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in re-activated after succeeded " + "balancing.")
                         else:
-                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in was not active before and was not activated.")
-                        
+                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in was not active before and was " + "not activated.")
+
                         # reset to prevent permanent logging and activation of  /Settings/CGwacs/OvervoltageFeedIn
                         self._DCfeedActive = False
                         self._dynCVLactivated = False
 
             if (MinCellVoltage <= settings.MIN_CELL_VOLTAGE) and settings.ZERO_SOC:
-                self._ownCharge = 0  # reset Coulumb counter to 0%
+                # reset Coulumb counter to 0%
+                self._ownCharge = 0
 
             # manage charge current
             if NrOfModulesBlockingCharge > 0:
@@ -1243,32 +1101,28 @@ class DbusAggBatService(object):
             # manage discharge current
             if MinCellVoltage <= settings.MIN_CELL_VOLTAGE:
                 self._fullyDischarged = True
-            elif (
-                MinCellVoltage
-                > settings.MIN_CELL_VOLTAGE + settings.MIN_CELL_HYSTERESIS
-            ):
+            elif MinCellVoltage > settings.MIN_CELL_VOLTAGE + settings.MIN_CELL_HYSTERESIS:
                 self._fullyDischarged = False
 
             if (NrOfModulesBlockingDischarge > 0) or (self._fullyDischarged):
                 MaxDischargeCurrent = 0
             else:
-                MaxDischargeCurrent = (
-                    settings.MAX_DISCHARGE_CURRENT
-                    * self._fn._interpolate(
-                        settings.CELL_DISCHARGE_LIMITING_VOLTAGE,
-                        settings.CELL_DISCHARGE_LIMITED_CURRENT,
-                        MinCellVoltage,
-                    )
+                MaxDischargeCurrent = settings.MAX_DISCHARGE_CURRENT * self._fn._interpolate(
+                    settings.CELL_DISCHARGE_LIMITING_VOLTAGE,
+                    settings.CELL_DISCHARGE_LIMITED_CURRENT,
+                    MinCellVoltage,
                 )
-        
+
         # SoC resetting if OWN_SOC = True and OWN_CHARGE_PARAMETERS = False
         else:
             if settings.OWN_SOC:
-                if (MaxCellVoltage >= settings.MAX_CELL_VOLTAGE_SOC_FULL):
-                    self._ownCharge = InstalledCapacity  # reset Coulumb counter to 100%
+                # reset Coulumb counter to 100%
+                if MaxCellVoltage >= settings.MAX_CELL_VOLTAGE_SOC_FULL:
+                    self._ownCharge = InstalledCapacity
                 if (MinCellVoltage <= settings.MIN_CELL_VOLTAGE_SOC_EMPTY) and settings.ZERO_SOC:
-                    self._ownCharge = 0  # reset Coulumb counter to 0%
-        
+                    # reset Coulumb counter to 0%
+                    self._ownCharge = 0
+
         ###########################################################
         # own Coulomb counter (runs even the BMS values are used) #
         ###########################################################
@@ -1276,18 +1130,16 @@ class DbusAggBatService(object):
         deltaTime = tt.time() - self._timeOld
         self._timeOld = tt.time()
         if Current > 0:
-            self._ownCharge += (
-                Current * (deltaTime / 3600) * settings.BATTERY_EFFICIENCY
-            )  # charging (with efficiency)
+            # charging (with efficiency)
+            self._ownCharge += Current * (deltaTime / 3600) * settings.BATTERY_EFFICIENCY
         else:
-            self._ownCharge += Current * (deltaTime / 3600)  # discharging
+            # discharging
+            self._ownCharge += Current * (deltaTime / 3600)
         self._ownCharge = max(self._ownCharge, 0)
         self._ownCharge = min(self._ownCharge, InstalledCapacity)
 
         # store the charge into text file if changed significantly (avoid frequent file access)
-        if abs(self._ownCharge - self._ownCharge_old) >= (
-            settings.CHARGE_SAVE_PRECISION * InstalledCapacity
-        ):
+        if abs(self._ownCharge - self._ownCharge_old) >= (settings.CHARGE_SAVE_PRECISION * InstalledCapacity):
             self._charge_file = open("/data/apps/dbus-aggregate-batteries/charge", "w")
             self._charge_file.write("%.3f" % self._ownCharge)
             self._charge_file.close()
@@ -1298,19 +1150,16 @@ class DbusAggBatService(object):
             Capacity = self._ownCharge
             Soc = 100 * self._ownCharge / InstalledCapacity
             ConsumedAmphours = InstalledCapacity - self._ownCharge
-            if (
-                self._dbusMon.dbusmon.get_value(
-                    "com.victronenergy.system", "/SystemState/LowSoc"
-                )
-                == 0
-            ) and (Current < 0):
+            if (self._dbusMon.dbusmon.get_value("com.victronenergy.system", "/SystemState/LowSoc") == 0) and (Current < 0):
                 TimeToGo = -3600 * self._ownCharge / Current
             else:
                 TimeToGo = None
         else:
-            Soc = Soc / InstalledCapacity  # weighted sum
+            # weighted sum
+            Soc = Soc / InstalledCapacity
             if TimeToGo is not None:
-                TimeToGo = TimeToGo / InstalledCapacity  # weighted sum
+                # weighted sum
+                TimeToGo = TimeToGo / InstalledCapacity
 
         #######################
         # Send values to DBus #
@@ -1319,9 +1168,12 @@ class DbusAggBatService(object):
         with self._dbusservice as bus:
 
             # send DC
-            bus["/Dc/0/Voltage"] = Voltage  # round(Voltage, 2)
-            bus["/Dc/0/Current"] = Current  # round(Current, 1)
-            bus["/Dc/0/Power"] = Power  # round(Power, 0)
+            bus["/Dc/0/Voltage"] = Voltage
+            # bus["/Dc/0/Voltage"] = round(Voltage, 2)
+            bus["/Dc/0/Current"] = Current
+            # bus["/Dc/0/Current"] = round(Current, 1)
+            bus["/Dc/0/Power"] = Power
+            # bus["/Dc/0/Power"] = round(Power, 0)
 
             # send charge
             bus["/Soc"] = Soc
@@ -1341,15 +1193,11 @@ class DbusAggBatService(object):
             bus["/System/MinCellVoltage"] = MinCellVoltage
             bus["/System/MinVoltageCellId"] = MinVoltageCellId
             bus["/Voltages/Sum"] = VoltagesSum
-            bus["/Voltages/Diff"] = round(
-                MaxCellVoltage - MinCellVoltage, 3
-            )  # Marvo2011
+            bus["/Voltages/Diff"] = round(MaxCellVoltage - MinCellVoltage, 3)
 
-            if settings.SEND_CELL_VOLTAGES == 1:  # Marvo2011
+            if settings.SEND_CELL_VOLTAGES == 1:
                 for cellId, currentCell in enumerate(cellVoltages_dict):
-                    bus[
-                        "/Voltages/%s" % (re.sub("[^A-Za-z0-9_]+", "", currentCell))
-                    ] = cellVoltages_dict[currentCell]
+                    bus["/Voltages/%s" % (re.sub("[^A-Za-z0-9_]+", "", currentCell))] = cellVoltages_dict[currentCell]
 
             # send battery state
             bus["/System/NrOfCellsPerBattery"] = settings.NR_OF_CELLS_PER_BATTERY
@@ -1362,7 +1210,8 @@ class DbusAggBatService(object):
             bus["/Alarms/LowVoltage"] = LowVoltage_alarm
             bus["/Alarms/HighVoltage"] = HighVoltage_alarm
             bus["/Alarms/LowCellVoltage"] = LowCellVoltage_alarm
-            # bus['/Alarms/HighCellVoltage'] = HighCellVoltage_alarm   # not implemended in Venus
+            # TODO: was now implemended in Venus OS
+            # bus['/Alarms/HighCellVoltage'] = HighCellVoltage_alarm
             bus["/Alarms/LowSoc"] = LowSoc_alarm
             bus["/Alarms/HighChargeCurrent"] = HighChargeCurrent_alarm
             bus["/Alarms/HighDischargeCurrent"] = HighDischargeCurrent_alarm
@@ -1375,7 +1224,6 @@ class DbusAggBatService(object):
             bus["/Alarms/BmsCable"] = BmsCable_alarm
 
             # send charge/discharge control
-
             bus["/Info/MaxChargeCurrent"] = MaxChargeCurrent
             bus["/Info/MaxDischargeCurrent"] = MaxDischargeCurrent
             bus["/Info/MaxChargeVoltage"] = MaxChargeVoltage
@@ -1386,7 +1234,8 @@ class DbusAggBatService(object):
                 bus['/Info/MaxChargeCurrent'] = MaxChargeCurrent
                 bus['/Info/MaxDischargeCurrent'] = MaxDischargeCurrent
                 bus['/Info/MaxChargeVoltage'] = MaxChargeVoltage
-            else:                                                       # if BMS connection lost
+            # if BMS connection lost
+            else:
                 bus['/Info/MaxChargeCurrent'] = 0
                 bus['/Info/MaxDischargeCurrent'] = 0
                 bus['/Info/MaxChargeVoltage'] = NR_OF_CELLS_PER_BATTERY * min(CHARGE_VOLTAGE_LIST)
@@ -1408,14 +1257,8 @@ class DbusAggBatService(object):
             else:
                 self._logTimer = 0
                 logging.info("%s: Repetitive logging:" % dt.now().strftime("%c"))
-                logging.info(
-                    "  CVL: %.1fV, CCL: %.0fA, DCL: %.0fA"
-                    % (MaxChargeVoltage, MaxChargeCurrent, MaxDischargeCurrent)
-                )
-                logging.info(
-                    "  Bat. voltage: %.1fV, Bat. current: %.0fA, SoC: %.1f%%, Balancing state: %d"
-                    % (Voltage, Current, Soc, self._balancing)
-                )
+                logging.info("  CVL: %.1fV, CCL: %.0fA, DCL: %.0fA" % (MaxChargeVoltage, MaxChargeCurrent, MaxDischargeCurrent))
+                logging.info("  Bat. voltage: %.1fV, Bat. current: %.0fA, SoC: %.1f%%, Balancing state: %d" % (Voltage, Current, Soc, self._balancing))
                 logging.info(
                     "  Min. cell voltage: %s: %.3fV, Max. cell voltage: %s: %.3fV, difference: %.3fV"
                     % (
@@ -1447,10 +1290,7 @@ def main():
 
     DbusAggBatService()
 
-    logging.info(
-        "%s: Connected to DBus, and switching over to GLib.MainLoop()"
-        % (dt.now()).strftime("%c")
-    )
+    logging.info("%s: Connected to DBus, and switching over to GLib.MainLoop()" % (dt.now()).strftime("%c"))
     mainloop = GLib.MainLoop()
     mainloop.run()
 
