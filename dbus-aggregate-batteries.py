@@ -73,8 +73,8 @@ class DbusAggBatService(object):
         # the number of SmartShunts at the beginning of _smartShunt_list that are in the
         # battery service (dc_load are listed behind)
         self._num_battery_shunts = 0
-        self._searchTrials = 0
-        self._readTrials = 0
+        self._searchTrials = 1
+        self._readTrials = 1
         self._MaxChargeVoltage_old = 0
         self._MaxChargeCurrent_old = 0
         self._MaxDischargeCurrent_old = 0
@@ -308,7 +308,7 @@ class DbusAggBatService(object):
             pass
 
         if self._settings is not None:
-            self._searchTrials = 0
+            self._searchTrials = 1
             # search batteries on DBus if present
             GLib.timeout_add(5000, self._find_batteries)
             # all OK, stop calling this function
@@ -551,7 +551,7 @@ class DbusAggBatService(object):
                 self._ownCharge = Soc
                 Soc /= InstalledCapacity
             if settings.CURRENT_FROM_VICTRON:
-                self._searchTrials = 0
+                self._searchTrials = 1
                 # if current from Victron stuff search multi/quattro on DBus
                 GLib.timeout_add(1000, self._find_multis)
             else:
@@ -620,7 +620,7 @@ class DbusAggBatService(object):
                     sys.exit()
 
         if settings.NR_OF_MPPTS > 0:
-            self._searchTrials = 0
+            self._searchTrials = 1
             # search MPPTs on DBus if present
             GLib.timeout_add(1000, self._find_mppts)
         else:
@@ -1035,7 +1035,7 @@ class DbusAggBatService(object):
                 logging.error("Victron current reading error. Using BMS current and power instead")
 
         # must be reset after try-except of all reads
-        self._readTrials = 0
+        self._readTrials = 1
 
         ####################################################################################################
         # Calculate own charge/discharge parameters (overwrite the values received from the SerialBattery) #
