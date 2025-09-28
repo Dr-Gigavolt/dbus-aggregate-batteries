@@ -32,10 +32,11 @@ import time as tt
 from dbusmon import DbusMon
 from threading import Thread
 
-sys.path.append("/data/apps/dbus-aggregate-batteries/ext/velib_python")
+# add ext folder to sys.path
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "4.0.20250913"
+VERSION = "4.0.20251009"
 
 
 class SystemBus(dbus.bus.BusConnection):
@@ -432,7 +433,7 @@ class DbusAggBatService(object):
                 if battery_service or dcload_service:
                     # if SmartShunt found, can be used for battery monitoring or DC load current
                     # depending on how it is set
-                    if (productName is not None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName):
+                    if (productName is not None) and (settings.SMARTSHUNT_NAME_KEYWORD in productName):
                         shunt_vrm_id = self._dbusMon.dbusmon.get_value(service, "/DeviceInstance")
                         logging.info("%s: Correct SmartShunt product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
 
@@ -555,11 +556,11 @@ class DbusAggBatService(object):
         # - no Multi/Quattro device installed (examples: a pure DC system, a different inverter/charger is used)
         # - current detection of Multi/Quattro is not wanted (i.e. SmartShunts are used instead)
         # may still want to aggregate their batteries when using no inverter/no Victron inverter/charger)
-        if len(settings.MULTI_KEY_WORD) > 0:
+        if len(settings.MULTI_KEYWORD) > 0:
             logging.info("%s: Searching Multi/Quattro VEbus: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
             try:
                 for service in self._dbusConn.list_names():
-                    if settings.MULTI_KEY_WORD in service:
+                    if settings.MULTI_KEYWORD in service:
                         self._multi = service
                         logging.info(
                             "%s: %s found."
@@ -604,7 +605,7 @@ class DbusAggBatService(object):
         logging.info("%s: Searching MPPTs: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
         try:
             for service in self._dbusConn.list_names():
-                if settings.MPPT_KEY_WORD in service:
+                if settings.MPPT_KEYWORD in service:
                     self._mppts_list.append(service)
                     logging.info(
                         "%s: %s found."
@@ -1284,8 +1285,37 @@ class DbusAggBatService(object):
 
 def main():
 
-    logging.basicConfig(level=logging.INFO)
-    logging.info("%s: Starting AggregateBatteries." % (dt.now()).strftime("%c"))
+    logging.basicConfig(level=settings.LOGGING)
+
+    logging.info("")
+    logging.info("*** Starting dbus-aggregate-batteries ***")
+
+    # show Venus OS version and device type
+    logging.info(
+        "Venus OS " + Functions.get_venus_os_version() + " (" + Functions.get_venus_os_image_type() + ") running on " + Functions.get_venus_os_device_type()
+    )
+
+    # show the version of the driver
+    logging.info(f"dbus-aggregate-batteries v{VERSION}")
+
+    # print config errors and exit if there are any
+    if settings.errors_in_config:
+        logging.error("Errors in config file:")
+
+        for error in settings.errors_in_config:
+            logging.error(f"|- {error}")
+
+        logging.error("")
+        logging.error("Please fix the errors in the config file and restart the program.")
+        tt.sleep(60)
+        sys.exit(1)
+
+    logging.info("========== Settings ==========")
+    logging.info("|- NR_OF_BATTERIES: %d" % settings.NR_OF_BATTERIES)
+    logging.info("|- NR_OF_CELLS_PER_BATTERY: %d" % settings.NR_OF_CELLS_PER_BATTERY)
+    logging.info("|- UPDATE_INTERVAL_FIND_DEVICES: %d s" % settings.UPDATE_INTERVAL_FIND_DEVICES)
+    logging.info("|- UPDATE_INTERVAL_DATA: %d s" % settings.UPDATE_INTERVAL_DATA)
+
     from dbus.mainloop.glib import DBusGMainLoop
 
     # Check if old value files exist, if yes rename them
