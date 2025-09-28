@@ -7,7 +7,7 @@ I deleted releases after July 7-th 2025 because there were issues with new insta
 - in dbus-aggregate-batteries/service/run change path /data to /data/apps
 - remove the old symbolic link /service/dbus-aggregate-batteries
 - create new symbolic link: ln -s /data/apps/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries
-- if you need shell scripts, change paths there to /data/apps as well
+- if you need shell scripts, change paths there to /data/apps as well. In this case correct the path to reinstall-local.sh in /data/rc.local. If you don't need them, you can delete them as well as the entry in rc.local. I recommend to keep and correct at least restart.sh and restart_dbus-serial-battery.sh, they are useful for debugging. 
 
 Other and perhaps the most simple temporary solution to make your system running is the release 3.5.20250707 with Venus OS 3.5x (I still run 3.55) 
 
