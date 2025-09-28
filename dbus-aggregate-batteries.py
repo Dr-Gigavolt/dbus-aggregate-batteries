@@ -58,10 +58,18 @@ class DbusAggBatService(object):
     def __init__(self, servicename="com.victronenergy.battery.aggregate"):
         self._fn = Functions()
         self._batteries_dict = {}
+        """ dictionary with battery name as key and dbus service as value """
+
         self._multi = None
+        """ dbus service of Multi/Quattro, if found """
+
         self._mppts_list = []
+        """ list of dbus services of MPPTs, if found """
+
         # store list of SmartShunts as specified in settings.py
         self._smartShunt_list = []
+        """ list of dbus services of SmartShunts, if found """
+
         # the number of SmartShunts at the beginning of _smartShunt_list that are in the
         # battery service (dc_load are listed behind)
         self._num_battery_shunts = 0
@@ -80,7 +88,7 @@ class DbusAggBatService(object):
         self._dbusConn = get_bus()
         logging.info("### Initialise VeDbusService ")
         self._dbusservice = VeDbusService(servicename, self._dbusConn, register=False)
-        logging.info("#### Done: Init of VeDbusService ")
+        logging.info("|- Done: Init of VeDbusService ")
         self._timeOld = tt.time()
         # written when dynamic CVL limit activated
         self._DCfeedActive = False
@@ -101,9 +109,9 @@ class DbusAggBatService(object):
             self._ownCharge = float(self._charge_file.readline().strip())
             self._charge_file.close()
             self._ownCharge_old = self._ownCharge
-            logging.info("%s: Initial Ah read from file: %.0fAh" % ((dt.now()).strftime("%c"), self._ownCharge))
+            logging.info("Initial Ah read from file: %.0fAh" % (self._ownCharge))
         except Exception:
-            logging.error("%s: Charge file read error. Exiting." % (dt.now()).strftime("%c"))
+            logging.error("Charge file read error. Exiting...")
             sys.exit()
 
         # read the day of the last balancing from text file
@@ -120,10 +128,10 @@ class DbusAggBatService(object):
                 if time_unbalanced < 0:
                     # year change
                     time_unbalanced += 365
-                logging.info("%s: Last balancing done at the %d. day of the year" % ((dt.now()).strftime("%c"), self._lastBalancing))
+                logging.info("Last balancing done at the %d. day of the year" % (self._lastBalancing))
                 logging.info("Batteries balanced %d days ago." % time_unbalanced)
             except Exception:
-                logging.error("%s: Last balancing file read error. Exiting." % (dt.now()).strftime("%c"))
+                logging.error("Last balancing file read error. Exiting...")
                 sys.exit()
 
         # Create the management objects, as specified in the ccgx dbus-api document
@@ -270,7 +278,7 @@ class DbusAggBatService(object):
     # #############################################################################################################
 
     def _startMonitor(self):
-        logging.info("%s: Starting battery monitor." % (dt.now()).strftime("%c"))
+        logging.info("Starting battery monitor")
         self._dbusMon = DbusMon()
 
     # ####################################################################
@@ -281,13 +289,22 @@ class DbusAggBatService(object):
     # ####################################################################
 
     def _find_settings(self):
-        logging.info("%s: Searching Settings: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
+        logging.info("Searching Settings: Trial Nr. %d" % self._searchTrials)
         try:
             for service in self._dbusConn.list_names():
                 if "com.victronenergy.settings" in service:
                     self._settings = service
-                    logging.info("%s: com.victronenergy.settings found." % (dt.now()).strftime("%c"))
+                    logging.info("|- com.victronenergy.settings found")
         except Exception:
+            (
+                exception_type,
+                exception_object,
+                exception_traceback,
+            ) = sys.exc_info()
+            file = exception_traceback.tb_frame.f_code.co_filename
+            line = exception_traceback.tb_lineno
+            logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
             pass
 
         if self._settings is not None:
@@ -301,7 +318,7 @@ class DbusAggBatService(object):
             # next trial
             return True
         else:
-            logging.error("%s: com.victronenergy.settings not found. Exiting." % (dt.now()).strftime("%c"))
+            logging.error("com.victronenergy.settings not found. Exiting...")
             sys.exit()
 
     # #####################################################################
@@ -358,13 +375,13 @@ class DbusAggBatService(object):
 
         # keep track of SmartShunt (user-defined) name as specified by SMARTSHUNT_INSTANCE_NAME_PATH
         shuntName = ""
-        logging.info("%s: Searching batteries: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
+        logging.info("Searching batteries: Trial Nr. %d" % self._searchTrials)
 
         # if Dbus monitor not running yet, new trial instead of exception
         try:
-            for service in self._dbusConn.list_names():
-                if "com.victronenergy" in service:
-                    logging.info("%s: Dbusmonitor sees: %s" % ((dt.now()).strftime("%c"), service))
+            service_names = [str(name) for name in self._dbusConn.list_names() if "com.victronenergy" in str(name)]
+            for service in sorted(service_names):
+                logging.info("|- Dbusmonitor sees: %s" % (service))
                 # Current device is in Victron "battery" service
                 battery_service = settings.BATTERY_SERVICE_NAME in service
                 # Current device is in Victron "dcload" service (i.e. a SmartShunt set to DC metering)
@@ -374,12 +391,21 @@ class DbusAggBatService(object):
                     shuntName = self._dbusMon.dbusmon.get_value(service, settings.SMARTSHUNT_INSTANCE_NAME_PATH)
                 if battery_service:
                     if (productName is not None) and (settings.BATTERY_PRODUCT_NAME in productName):
-                        logging.info("%s: Correct battery product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
+                        logging.info('   |- Correct battery product name "%s" found' % productName)
 
                         # Custom name, if exists
                         try:
                             BatteryName = self._dbusMon.dbusmon.get_value(service, settings.BATTERY_INSTANCE_NAME_PATH)
                         except Exception:
+                            (
+                                exception_type,
+                                exception_object,
+                                exception_traceback,
+                            ) = sys.exc_info()
+                            file = exception_traceback.tb_frame.f_code.co_filename
+                            line = exception_traceback.tb_lineno
+                            logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
                             BatteryName = "Battery%d" % (batteriesCount + 1)
 
                         # Check if all batteries have custom names
@@ -387,14 +413,9 @@ class DbusAggBatService(object):
                             BatteryName = "%s%d" % (BatteryName, batteriesCount + 1)
 
                         self._batteries_dict[BatteryName] = service
-                        logging.info(
-                            "%s: %s found, named as: %s."
-                            % (
-                                (dt.now()).strftime("%c"),
-                                (self._dbusMon.dbusmon.get_value(service, "/ProductName")),
-                                BatteryName,
-                            )
-                        )
+                        logging.info("   |- Battery name: %s" % BatteryName)
+                        logging.info("   |- Custom name:  %s" % self._dbusMon.dbusmon.get_value(service, "/CustomName"))
+                        logging.info("   |- Product name: %s" % self._dbusMon.dbusmon.get_value(service, "/ProductName"))
 
                         batteriesCount += 1
 
@@ -404,7 +425,7 @@ class DbusAggBatService(object):
                             battery_soc = self._dbusMon.dbusmon.get_value(service, "/Soc") * battery_capacity
                             InstalledCapacity += battery_capacity
                             Soc += battery_soc
-                            logging.info("%s SoC: %f / %f Ah" % (BatteryName, battery_soc / 100.0, battery_capacity))
+                            logging.info("      |- SoC: %f / %f Ah" % (battery_soc / 100.0, battery_capacity))
 
                         # Create voltage paths with battery names
                         if settings.SEND_CELL_VOLTAGES == 1:
@@ -422,7 +443,12 @@ class DbusAggBatService(object):
 
                         # Check if Nr. of cells is equal
                         if self._dbusMon.dbusmon.get_value(service, "/System/NrOfCellsPerBattery") != settings.NR_OF_CELLS_PER_BATTERY:
-                            logging.error("%s: Number of cells of batteries is not correct. Exiting." % (dt.now()).strftime("%c"))
+                            logging.error("     |- Number of battery cells does not match config:")
+                            logging.error(
+                                "        |- Cells found in battery:         %d" % (self._dbusMon.dbusmon.get_value(service, "/System/NrOfCellsPerBattery"))
+                            )
+                            logging.error("        |- Cells specified in config file: %d" % (settings.NR_OF_CELLS_PER_BATTERY))
+                            logging.error("Exiting...")
                             sys.exit()
 
                         # end of section
@@ -435,7 +461,7 @@ class DbusAggBatService(object):
                     # depending on how it is set
                     if (productName is not None) and (settings.SMARTSHUNT_NAME_KEYWORD in productName):
                         shunt_vrm_id = self._dbusMon.dbusmon.get_value(service, "/DeviceInstance")
-                        logging.info("%s: Correct SmartShunt product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
+                        logging.info('   |- Correct SmartShunt product name "%s" found' % productName)
 
                         # user specified to use SmartShunts
                         if use_smartshunts:
@@ -462,8 +488,8 @@ class DbusAggBatService(object):
                                     # Bail out with an error if list entry is neither string integer nor string
                                     else:
                                         logging.error(
-                                            '%s: Bad element #%d in "%s" in USE_SMARTSHUNTS list. Entries need to be '
-                                            + " VRM instance numbers or Name strings. Exiting." % (dt.now()).strftime("%c"),
+                                            '   |- Bad element #%d in "%s" in USE_SMARTSHUNTS list. Entries need to be '
+                                            + " VRM instancmbers or Name strings. Exiting...",
                                             shunt_id + 1,
                                             settings.USE_SMARTSHUNTS[shunt_id],
                                         )
@@ -485,9 +511,8 @@ class DbusAggBatService(object):
                                 else:
                                     self._smartShunt_list.append(service)
                                 logging.info(
-                                    "%s: %s [%d] added, named as: %s."
+                                    "   |- %s [%d] added, named as: %s."
                                     % (
-                                        (dt.now()).strftime("%c"),
                                         productName,
                                         shunt_vrm_id,
                                         shuntName,
@@ -496,21 +521,29 @@ class DbusAggBatService(object):
                 # end of SmartShunt detection (AT, 2025)
 
         except Exception:
+            (
+                exception_type,
+                exception_object,
+                exception_traceback,
+            ) = sys.exc_info()
+            file = exception_traceback.tb_frame.f_code.co_filename
+            line = exception_traceback.tb_lineno
+            logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
             pass
 
         # when SmartShunts have been found, add their overall number in addition to
         # the number of batteries aggregated to the log output
         if len(self._smartShunt_list) > 0:
             logging.info(
-                "%s: %d batteries and %d SmartShunts found."
+                "%d batteries and %d SmartShunts found"
                 % (
-                    (dt.now()).strftime("%c"),
                     batteriesCount,
                     len(self._smartShunt_list),
                 )
             )
         else:
-            logging.info("%s: %d batteries found." % ((dt.now()).strftime("%c"), batteriesCount))
+            logging.info("> %d batteries found." % (batteriesCount))
 
         # make sure the correct number of batteries and SmartShunts has been found
         if (batteriesCount == settings.NR_OF_BATTERIES) and (len(self._smartShunt_list) >= NR_OF_SMARTSHUNTS):
@@ -537,12 +570,13 @@ class DbusAggBatService(object):
         else:
             if NR_OF_SMARTSHUNTS > 0:
                 logging.error(
-                    "%s: Required number of batteries (%d) or SmartShunts (%d) not found. Exiting." % (dt.now()).strftime("%c"),
+                    "Required nr of batteries (%d) or SmartShunts (%d) not found. Exiting...",
                     settings.NR_OF_BATTERIES,
                     NR_OF_SMARTSHUNTS,
                 )
             else:
-                logging.error("%s: Required number of batteries not found. Exiting." % (dt.now()).strftime("%c"))
+                print(self._batteries_dict)
+                logging.error("Required number of batteries not found. Exiting...")
             sys.exit()
 
     # #########################################################################
@@ -557,28 +591,32 @@ class DbusAggBatService(object):
         # - current detection of Multi/Quattro is not wanted (i.e. SmartShunts are used instead)
         # may still want to aggregate their batteries when using no inverter/no Victron inverter/charger)
         if len(settings.MULTI_KEYWORD) > 0:
-            logging.info("%s: Searching Multi/Quattro VEbus: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
+            logging.info("Searching Multi/Quattro VEbus: Trial Nr. %d" % self._searchTrials)
             try:
                 for service in self._dbusConn.list_names():
                     if settings.MULTI_KEYWORD in service:
                         self._multi = service
-                        logging.info(
-                            "%s: %s found."
-                            % (
-                                (dt.now()).strftime("%c"),
-                                (self._dbusMon.dbusmon.get_value(service, "/ProductName")),
-                            )
-                        )
+                        logging.info("|- %s found." % ((self._dbusMon.dbusmon.get_value(service, "/ProductName")),))
             except Exception:
+                (
+                    exception_type,
+                    exception_object,
+                    exception_traceback,
+                ) = sys.exc_info()
+                file = exception_traceback.tb_frame.f_code.co_filename
+                line = exception_traceback.tb_lineno
+                logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
                 pass
 
+            logging.info("> 1 Multi/Quattro.")
             if self._multi is None:
                 if self._searchTrials < settings.SEARCH_TRIALS:
                     self._searchTrials += 1
                     # next trial
                     return True
                 else:
-                    logging.error("%s: Multi/Quattro not found. Exiting." % (dt.now()).strftime("%c"))
+                    logging.error("Multi/Quattro not found. Exiting...")
                     sys.exit()
 
         if settings.NR_OF_MPPTS > 0:
@@ -602,23 +640,26 @@ class DbusAggBatService(object):
     def _find_mppts(self):
         self._mppts_list = []
         mpptsCount = 0
-        logging.info("%s: Searching MPPTs: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
+        logging.info("Searching MPPT(s): Trial Nr. %d" % self._searchTrials)
         try:
             for service in self._dbusConn.list_names():
                 if settings.MPPT_KEYWORD in service:
                     self._mppts_list.append(service)
-                    logging.info(
-                        "%s: %s found."
-                        % (
-                            (dt.now()).strftime("%c"),
-                            (self._dbusMon.dbusmon.get_value(service, "/ProductName")),
-                        )
-                    )
+                    logging.info("|- %s found." % ((self._dbusMon.dbusmon.get_value(service, "/ProductName")),))
                     mpptsCount += 1
         except Exception:
+            (
+                exception_type,
+                exception_object,
+                exception_traceback,
+            ) = sys.exc_info()
+            file = exception_traceback.tb_frame.f_code.co_filename
+            line = exception_traceback.tb_lineno
+            logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
             pass
 
-        logging.info("%s: %d MPPT(s) found." % ((dt.now()).strftime("%c"), mpptsCount))
+        logging.info("> %d MPPT(s) found." % (mpptsCount))
         if mpptsCount == settings.NR_OF_MPPTS:
             self._timeOld = tt.time()
             GLib.timeout_add(1000, self._update)
@@ -629,7 +670,7 @@ class DbusAggBatService(object):
             # next trial
             return True
         else:
-            logging.error("%s: Required number of MPPTs not found. Exiting." % (dt.now()).strftime("%c"))
+            logging.error("Required number of MPPTs not found. Exiting...")
             sys.exit()
 
     # #################################################################################
@@ -767,7 +808,7 @@ class DbusAggBatService(object):
                 else:
                     raise TypeError(
                         f"Battery {i} returns None value of /Voltages/Sum. Please check, if the setting "
-                        + "'BATTERY_CELL_DATA_FORMAT=1' in dbus-serialbattery config."
+                        + "'BATTERY_CELL_DATA_FORMAT=1' in dbus-serialbattery config"
                     )
 
                 # Battery state
@@ -838,11 +879,20 @@ class DbusAggBatService(object):
 
         except Exception as err:
             self._readTrials += 1
-            logging.error("%s: Error: %s." % ((dt.now()).strftime("%c"), err))
+            (
+                exception_type,
+                exception_object,
+                exception_traceback,
+            ) = sys.exc_info()
+            file = exception_traceback.tb_frame.f_code.co_filename
+            line = exception_traceback.tb_lineno
+            logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
+            logging.error("Error: %s." % (err))
             logging.error("Occured during step %s, Battery %s." % (step, i))
             logging.error("Read trial nr. %d" % self._readTrials)
             if self._readTrials > settings.READ_TRIALS:
-                logging.error("%s: DBus read failed. Exiting." % (dt.now()).strftime("%c"))
+                logging.error("DBus read failed. Exiting...")
                 sys.exit()
             else:
                 # next call allowed
@@ -912,12 +962,12 @@ class DbusAggBatService(object):
                         Current_VE = self._dbusMon.dbusmon.get_value(self._multi, "/Dc/0/Current")
                         # Output to log that Multi/Quattro is connected again
                         if not self._multi_connected:
-                            logging.info("Multi/Quattro is connected.")
+                            logging.info("Multi/Quattro is connected")
                         self._multi_connected = True  # keep track of state to notice if state changes at next round
                     else:
                         # Output to log when Multi/Quattro state changed from connected (at last read) to not connected
                         if self._multi_connected:
-                            logging.info("Multi/Quattro is not connected.")
+                            logging.info("Multi/Quattro is not connected")
                         self._multi_connected = False  # keep track of state to notice if state changes at next round
 
                 for i in range(settings.NR_OF_MPPTS):
@@ -925,6 +975,15 @@ class DbusAggBatService(object):
                     Current_VE += self._dbusMon.dbusmon.get_value(self._mppts_list[i], "/Dc/0/Current")
 
             except Exception:
+                (
+                    exception_type,
+                    exception_object,
+                    exception_traceback,
+                ) = sys.exc_info()
+                file = exception_traceback.tb_frame.f_code.co_filename
+                line = exception_traceback.tb_lineno
+                logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
                 success = False
 
             Current_SHUNTS = 0
@@ -933,7 +992,7 @@ class DbusAggBatService(object):
                 for i in range(len(self._smartShunt_list)):
                     shunt_current = self._dbusMon.dbusmon.get_value(self._smartShunt_list[i], "/Dc/0/Current")
                     if shunt_current is None:
-                        raise ValueError(f"SmartShunt {self._smartShunt_list[i]} returns None as current.")
+                        raise ValueError(f"SmartShunt {self._smartShunt_list[i]} returns None as current")
                 # SmartShunt is monitored as a battery
                 if i < self._num_battery_shunts:
                     Current_SHUNTS += shunt_current
@@ -941,7 +1000,16 @@ class DbusAggBatService(object):
                 else:
                     Current_SHUNTS -= shunt_current
             except Exception as err:
-                logging.error("%s: Error during SmartShunt polling: %s" % ((dt.now()).strftime("%c"), err))
+                (
+                    exception_type,
+                    exception_object,
+                    exception_traceback,
+                ) = sys.exc_info()
+                file = exception_traceback.tb_frame.f_code.co_filename
+                line = exception_traceback.tb_lineno
+                logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
+                logging.error("Error during SmartShunt polling: %s" % (err))
                 if settings.IGNORE_SMARTSHUNT_ABSENCE:
                     success = False
                     pass
@@ -964,7 +1032,7 @@ class DbusAggBatService(object):
                 Power = Voltage * Current_VE
             else:
                 # the BMS values are not overwritten
-                logging.error("%s: Victron current reading error. Using BMS current and power instead." % (dt.now()).strftime("%c"))
+                logging.error("Victron current reading error. Using BMS current and power instead")
 
         # must be reset after try-except of all reads
         self._readTrials = 0
@@ -990,13 +1058,13 @@ class DbusAggBatService(object):
                 if (self._balancing == 0) and (time_unbalanced >= settings.BALANCING_REPETITION):
                     # activate increased CVL for balancing
                     self._balancing = 1
-                    logging.info("%s: CVL increase for balancing activated." % (dt.now()).strftime("%c"))
+                    logging.info("CVL increase for balancing activated")
 
                 if self._balancing == 1:
                     ChargeVoltageBattery = CVL_BALANCING
                     if (Voltage >= CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX):
                         self._balancing = 2
-                        logging.info("%s: Balancing goal reached." % (dt.now()).strftime("%c"))
+                        logging.info("Balancing goal reached")
 
                 if self._balancing >= 2:
                     # keep balancing voltage at balancing day until decrease of solar powers and
@@ -1011,16 +1079,14 @@ class DbusAggBatService(object):
                         )
                         self._lastBalancing_file.write("%s" % self._lastBalancing)
                         self._lastBalancing_file.close()
-                        logging.info("%s: CVL increase for balancing de-activated." % (dt.now()).strftime("%c"))
+                        logging.info("CVL increase for balancing de-activated")
 
                 if self._balancing == 0:
                     ChargeVoltageBattery = CVL_NORMAL
 
             # if normal charging voltage is 100% SoC and balancing is finished
             elif (time_unbalanced > 0) and (Voltage >= CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX):
-                logging.info(
-                    "%s: Balancing goal reached with full charging set as normal. Updating storedvalue_last_balancing file." % (dt.now()).strftime("%c")
-                )
+                logging.info("Balancing goal reached with full charging set as normal. Updating storedvalue_last_balancing file")
                 self._lastBalancing = int((dt.now()).strftime("%j"))
                 self._lastBalancing_file = open(
                     "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
@@ -1037,9 +1103,7 @@ class DbusAggBatService(object):
             if MaxCellVoltage >= settings.MAX_CELL_VOLTAGE:
                 if not self._dynamicCVL:
                     self._dynamicCVL = True
-                    logging.info(
-                        f"{(dt.now()).strftime('%c')}: Dynamic CVL reduction started due to max. cell voltage: " + f"{MaxVoltageCellId} {MaxCellVoltage:.3f}V."
-                    )
+                    logging.info(f"Dynamic CVL reduction started due to max. cell voltage: {MaxVoltageCellId} {MaxCellVoltage:.3f}V")
                     # avoid periodic readout
                     if not self._dynCVLactivated:
                         self._dynCVLactivated = True
@@ -1057,9 +1121,9 @@ class DbusAggBatService(object):
                         )
 
                         if self._DCfeedActive == 0:
-                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in was not active.")
+                            logging.info("DC-coupled PV feed-in was not active")
                         else:
-                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in de-activated.")
+                            logging.info("DC-coupled PV feed-in de-activated")
 
                 # avoid exceeding MAX_CELL_VOLTAGE
                 MaxChargeVoltage = min((min(chargeVoltageReduced_list)), ChargeVoltageBattery)
@@ -1069,7 +1133,7 @@ class DbusAggBatService(object):
 
                 if self._dynamicCVL:
                     self._dynamicCVL = False
-                    logging.info("%s: Dynamic CVL reduction finished." % (dt.now()).strftime("%c"))
+                    logging.info("Dynamic CVL reduction finished")
                     if (MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX:
 
                         # re-enable DC-feed if it was enabled before
@@ -1079,9 +1143,9 @@ class DbusAggBatService(object):
                             self._DCfeedActive,
                         )
                         if self._DCfeedActive:
-                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in re-activated after succeeded " + "balancing.")
+                            logging.info("DC-coupled PV feed-in re-activated after succeeded " + "balancing")
                         else:
-                            logging.info(f"{(dt.now()).strftime('%c')}: DC-coupled PV feed-in was not active before and was " + "not activated.")
+                            logging.info("DC-coupled PV feed-in was not active before and was " + "not activated")
 
                         # reset to prevent permanent logging and activation of  /Settings/CGwacs/OvervoltageFeedIn
                         self._DCfeedActive = False
@@ -1234,15 +1298,15 @@ class DbusAggBatService(object):
             """
             # Not working, Serial Battery disapears regardles BLOCK_ON_DISCONNECT is True or False
             if BmsCable_alarm == 0:
-                bus['/Info/MaxChargeCurrent'] = MaxChargeCurrent
-                bus['/Info/MaxDischargeCurrent'] = MaxDischargeCurrent
-                bus['/Info/MaxChargeVoltage'] = MaxChargeVoltage
+                bus["/Info/MaxChargeCurrent"] = MaxChargeCurrent
+                bus["/Info/MaxDischargeCurrent"] = MaxDischargeCurrent
+                bus["/Info/MaxChargeVoltage"] = MaxChargeVoltage
             # if BMS connection lost
             else:
-                bus['/Info/MaxChargeCurrent'] = 0
-                bus['/Info/MaxDischargeCurrent'] = 0
-                bus['/Info/MaxChargeVoltage'] = NR_OF_CELLS_PER_BATTERY * min(CHARGE_VOLTAGE_LIST)
-                logging.error('%s: BMS connection lost.' % (dt.now()).strftime('%c'))
+                bus["/Info/MaxChargeCurrent"] = 0
+                bus["/Info/MaxDischargeCurrent"] = 0
+                bus["/Info/MaxChargeVoltage"] = NR_OF_CELLS_PER_BATTERY * min(CHARGE_VOLTAGE_LIST)
+                logging.error("BMS connection lost.")
             """
 
             # this does not control the charger, is only displayed in GUI
@@ -1259,7 +1323,7 @@ class DbusAggBatService(object):
                 self._logTimer += 1
             else:
                 self._logTimer = 0
-                logging.info("%s: Repetitive logging:" % dt.now().strftime("%c"))
+                logging.info("Repetitive logging:")
                 logging.info("  CVL: %.1fV, CCL: %.0fA, DCL: %.0fA" % (MaxChargeVoltage, MaxChargeCurrent, MaxDischargeCurrent))
                 logging.info("  Bat. voltage: %.1fV, Bat. current: %.0fA, SoC: %.1f%%, Balancing state: %d" % (Voltage, Current, Soc, self._balancing))
                 logging.info(
@@ -1324,20 +1388,20 @@ def main():
             "/data/apps/dbus-aggregate-batteries/charge",
             "/data/apps/dbus-aggregate-batteries/storedvalue_charge",
         )
-        logging.info("%s: charge file renamed to storedvalue_charge." % (dt.now()).strftime("%c"))
+        logging.info("Charge file renamed to storedvalue_charge")
 
     if os.path.isfile("/data/apps/dbus-aggregate-batteries/last_balancing"):
         os.rename(
             "/data/apps/dbus-aggregate-batteries/last_balancing",
             "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
         )
-        logging.info("%s: last_balancing file renamed to storedvalue_last_balancing." % (dt.now()).strftime("%c"))
+        logging.info("Bast_balancing file renamed to storedvalue_last_balancing")
 
     DBusGMainLoop(set_as_default=True)
 
     DbusAggBatService()
 
-    logging.info("%s: Connected to DBus, and switching over to GLib.MainLoop()" % (dt.now()).strftime("%c"))
+    logging.info("Connected to DBus, and switching over to GLib.MainLoop()")
     mainloop = GLib.MainLoop()
     mainloop.run()
 

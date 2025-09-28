@@ -58,7 +58,7 @@ If you restart the [dbus-serialbattery](https://github.com/mr-manuel/venus-os_db
 For debugging and to see the error messages in the console, stop the service with `svc -d /service/dbus-aggregate-batteries` and start the software manually by executing `python3 /data/apps/dbus-aggregate-batteries/dbus-aggregate-batteries.py`.
 After debugging start the service again with `svc -u /service/dbus-aggregate-batteries`.
 
-Logging file: `tail -F /var/log/dbus-aggregate-batteries/current` or use any text file editor.
+To check the logs run `/data/apps/dbus-aggregate-batteries/get-logs.sh` and exit again with `CTRL + C`.
 
 If you wish to mount the code into `/opt/victronenergy/` follow these instructions:
 https://github.com/Dr-Gigavolt/dbus-aggregate-batteries/issues/24
