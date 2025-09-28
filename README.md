@@ -1,12 +1,12 @@
 ## Attention - troubles with new Venus OS (probably since 3.60)
 
-I deleted releases after July 7-th 2025 because there were issues with new installation stcripts. I apologize I have no time to care about it and hope in help of other contributors. If you have upgraded Victron OS to v.3.6x and have incompatibility issues with installation path /data (otherwise don't touch running system) please copy the AggregateBatteries directory into /data/app manually, remove the old symbolic link
+I deleted releases after July 7-th 2025 because there were issues with new installation stcripts. I apologize I have no time to care about it and hope in help of other contributors. If you have upgraded Victron OS to v.3.6x and have incompatibility issues with installation path /data (otherwise don't touch running system) please:
 
-/service/dbus-aggregate-batteries
-
-and create a new one:
-
-ln -s /data/apps/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries
+- copy the AggregateBatteries directory into /data/app manually
+- in aggregatebatteries.py change all absolute paths /data to /data/apps (or try relative paths, but the absolute are 100% reliable)
+- remove the old symbolic link /service/dbus-aggregate-batteries
+- create new symbolic link: ln -s /data/apps/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries
+- if you need shell scripts, change paths there to /data/apps as well
 
 Other and perhaps the most simple temporary solution to make your system running is the release 3.5.20250707 with Venus OS 3.5x (I still run 3.55) 
 
