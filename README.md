@@ -2,8 +2,9 @@
 
 I deleted releases after July 7-th 2025 because there were issues with new installation stcripts. I apologize I have no time to care about it and hope in help of other contributors. If you have upgraded Victron OS to v.3.6x and have incompatibility issues with installation path /data (otherwise don't touch running system) please:
 
-- copy the AggregateBatteries directory into /data/app manually
-- in aggregatebatteries.py change all absolute paths /data to /data/apps (or try relative paths, but the absolute are 100% reliable)
+- copy the dbus-aggregate-batteries directory into /data/app manually
+- in dbus-aggregate-batteries/aggregatebatteries.py change all absolute paths /data to /data/apps
+- in dbus-aggregate-batteries/service/run change path /data to /data/apps
 - remove the old symbolic link /service/dbus-aggregate-batteries
 - create new symbolic link: ln -s /data/apps/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries
 - if you need shell scripts, change paths there to /data/apps as well
