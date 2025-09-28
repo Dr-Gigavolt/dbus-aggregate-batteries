@@ -49,7 +49,7 @@ The service starts automatically after start/restart of the Venus OS. After modi
 
 If you restart the Serial Battery, wait until all instances are visible, assign CustomNames and restart the Aggregate Batteries
 
-For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: `python3 /data/apps/dbus-aggregate-batteries/aggregatebatteries.py`
+For debugging (to see the error messages in the console) it is reasonable to rename: ./service/run and start by: `python3 /data/apps/dbus-aggregate-batteries/dbus-aggregate-batteries.py`
 
 Logging file: `tail -F /var/log/dbus-aggregate-batteries/current` or use any text file editor.
 

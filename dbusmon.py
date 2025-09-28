@@ -3,7 +3,7 @@
 import sys
 import logging
 
-sys.path.append("/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
+sys.path.append("/data/apps/dbus-aggregate-batteries/ext/velib_python")
 from dbusmonitor import DbusMonitor  # noqa: E402
 from dbus.mainloop.glib import DBusGMainLoop  # noqa: E402
 
@@ -118,7 +118,7 @@ class DbusMon:
             "com.victronenergy.vebus": {
                 "/Connected": dummy,
                 "/Dc/0/Current": dummy,
-                "/ProductName": dummy
+                "/ProductName": dummy,
             },
             "com.victronenergy.solarcharger": {
                 "/Dc/0/Current": dummy,
@@ -154,9 +154,7 @@ def main():
     # dbusmon.print_values('com.victronenergy.vebus.ttyUSB0', 'com.victronenergy.vebus')
     # dbusmon.print_values('com.victronenergy.solarcharger.ttyUSB1', 'com.victronenergy.solarcharger')
     dbusmon.print_values("com.victronenergy.settings", "com.victronenergy.settings")
-    dbusmon.dbusmon.set_value(
-        "com.victronenergy.settings", "/Settings/CGwacs/OvervoltageFeedIn", 0
-    )
+    dbusmon.dbusmon.set_value("com.victronenergy.settings", "/Settings/CGwacs/OvervoltageFeedIn", 0)
 
     # GLib.timeout_add(1000, dbusmon.print_values, 'com.victronenergy.battery.ttyUSB2')
     # Start and run the mainloop
