@@ -15,11 +15,11 @@ fi
 
 
 function backup_config {
-    # backup settings.py
+    # backup config.ini
     # driver >= v4.0.0
-    if [ -f "/data/apps/dbus-aggregate-batteries/settings.py" ]; then
-        mv /data/apps/dbus-aggregate-batteries/settings.py /data/apps/dbus-aggregate-batteries_settings.py.backup
-        echo "settings.py backed up to /data/apps/dbus-aggregate-batteries_settings.py.backup"
+    if [ -f "/data/apps/dbus-aggregate-batteries/config.ini" ]; then
+        mv /data/apps/dbus-aggregate-batteries/config.ini /data/apps/dbus-aggregate-batteries_config.ini.backup
+        echo "config.ini backed up to /data/apps/dbus-aggregate-batteries_config.ini.backup"
     # driver < v4.0.0
     elif [ -f "/data/dbus-aggregate-batteries/settings.py" ]; then
         mv /data/dbus-aggregate-batteries/settings.py /data/dbus-aggregate-batteries_settings.py.backup
@@ -50,24 +50,35 @@ function backup_config {
 }
 
 function restore_config {
-    # restore settings.py
+    # restore config.ini
     # installation of driver >= v4.0.0
-    if [ -f "/data/apps/dbus-aggregate-batteries_settings.py.backup" ]; then
+    if [ -f "/data/apps/dbus-aggregate-batteries_config.ini.backup" ]; then
         # restore to driver >= v4.0.0 (normal update)
         if [ -d "/data/apps/dbus-aggregate-batteries" ]; then
-            mv /data/apps/dbus-aggregate-batteries_settings.py.backup /data/apps/dbus-aggregate-batteries/settings.py
-            echo "settings.py restored to /data/apps/dbus-aggregate-batteries/settings.py"
+            mv /data/apps/dbus-aggregate-batteries_config.ini.backup /data/apps/dbus-aggregate-batteries/config.ini
+            echo "config.ini restored to /data/apps/dbus-aggregate-batteries/config.ini"
         # restore to driver < v4.0.0 (downgrade)
         elif [ -d "/data/dbus-aggregate-batteries" ]; then
-            mv /data/apps/dbus-aggregate-batteries_settings.py.backup /data/dbus-aggregate-batteries/settings.py
-            echo "settings.py restored to /data/dbus-aggregate-batteries/settings.py"
+            mv /data/apps/dbus-aggregate-batteries_config.ini.backup /data/dbus-aggregate-batteries/config.ini
+            # print in red color
+            echo -e "\e[31m"
+            echo "WARNING: downgrade detected, configurations not compatible!"
+            echo "         config.ini NOT restored to /data/dbus-aggregate-batteries/config.ini"
+            echo "         Please reconfigure the old settings.py manually!"
+            echo "         The new config.ini is available at /data/apps/dbus-aggregate-batteries_config.ini.backup"
+            echo -e "\e[0m"
         fi
     # installation of driver < v4.0.0
     elif [ -f "/data/dbus-aggregate-batteries_settings.py.backup" ]; then
         # restore to driver >= v4.0.0 (upgrade)
         if [ -d "/data/apps/dbus-aggregate-batteries" ]; then
-            mv /data/dbus-aggregate-batteries_settings.py.backup /data/apps/dbus-aggregate-batteries/settings.py
-            echo "settings.py restored to /data/apps/dbus-aggregate-batteries/settings.py"
+            # print in red color
+            echo -e "\e[31m"
+            echo "WARNING: upgrade detected, configurations not compatible!"
+            echo "         settings.py NOT restored to /data/apps/dbus-aggregate-batteries/settings.py"
+            echo "         Please reconfigure the new config.ini manually!"
+            echo "         The old settings.py is available at /data/dbus-aggregate-batteries_settings.py.backup"
+            echo -e "\e[0m"
         # restore to driver < v4.0.0 (normal update)
         elif [ -d "/data/dbus-aggregate-batteries" ]; then
             mv /data/dbus-aggregate-batteries_settings.py.backup /data/dbus-aggregate-batteries/settings.py

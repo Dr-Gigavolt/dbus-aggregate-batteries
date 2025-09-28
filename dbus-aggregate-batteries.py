@@ -32,10 +32,11 @@ import time as tt
 from dbusmon import DbusMon
 from threading import Thread
 
-sys.path.append("/data/apps/dbus-aggregate-batteries/ext/velib_python")
+# add ext folder to sys.path
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "4.0.20250913"
+VERSION = "4.0.20250928"
 
 
 class SystemBus(dbus.bus.BusConnection):
@@ -432,7 +433,7 @@ class DbusAggBatService(object):
                 if battery_service or dcload_service:
                     # if SmartShunt found, can be used for battery monitoring or DC load current
                     # depending on how it is set
-                    if (productName is not None) and (settings.SMARTSHUNT_NAME_KEY_WORD in productName):
+                    if (productName is not None) and (settings.SMARTSHUNT_NAME_KEYWORD in productName):
                         shunt_vrm_id = self._dbusMon.dbusmon.get_value(service, "/DeviceInstance")
                         logging.info("%s: Correct SmartShunt product name %s found in the service %s" % ((dt.now()).strftime("%c"), productName, service))
 
@@ -555,11 +556,11 @@ class DbusAggBatService(object):
         # - no Multi/Quattro device installed (examples: a pure DC system, a different inverter/charger is used)
         # - current detection of Multi/Quattro is not wanted (i.e. SmartShunts are used instead)
         # may still want to aggregate their batteries when using no inverter/no Victron inverter/charger)
-        if len(settings.MULTI_KEY_WORD) > 0:
+        if len(settings.MULTI_KEYWORD) > 0:
             logging.info("%s: Searching Multi/Quattro VEbus: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
             try:
                 for service in self._dbusConn.list_names():
-                    if settings.MULTI_KEY_WORD in service:
+                    if settings.MULTI_KEYWORD in service:
                         self._multi = service
                         logging.info(
                             "%s: %s found."
@@ -604,7 +605,7 @@ class DbusAggBatService(object):
         logging.info("%s: Searching MPPTs: Trial Nr. %d" % ((dt.now()).strftime("%c"), (self._searchTrials + 1)))
         try:
             for service in self._dbusConn.list_names():
-                if settings.MPPT_KEY_WORD in service:
+                if settings.MPPT_KEYWORD in service:
                     self._mppts_list.append(service)
                     logging.info(
                         "%s: %s found."

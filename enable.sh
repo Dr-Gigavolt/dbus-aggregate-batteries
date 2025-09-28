@@ -35,9 +35,31 @@ grep -qxF "bash /data/apps/dbus-aggregate-batteries/enable.sh > /data/apps/dbus-
 
 
 
+# add empty config.ini, if it does not exist to make it easier for users to add custom settings
+filename="/data/apps/dbus-aggregate-batteries/config.ini"
+if [ ! -f "$filename" ]; then
+    {
+        echo "[DEFAULT]"
+        echo
+        echo "; If you want to add custom values/settings, then check the values/settings you want to change in \"config.default.ini\""
+        echo "; and insert them below to persist future driver updates."
+        echo "; NOTICE: Do not copy the whole file, but only the values/settings you want to change."
+        echo
+        echo "; Example (remove the semicolon \";\" to uncomment and activate the value/setting):"
+        echo "; NR_OF_BATTERIES = 2"
+        echo "; NR_OF_CELLS_PER_BATTERY = 16"
+        echo
+        echo
+    } > $filename
+fi
+
+
+
 # stop dbus-aggregate-batteries service
-echo "Stop dbus-aggregate-batteries service..."
-svc -d "/service/dbus-aggregate-batteries"
+if [ -d "/service/dbus-aggregate-batteries" ]; then
+    echo "Stop dbus-aggregate-batteries service..."
+    svc -d "/service/dbus-aggregate-batteries"
+fi
 
 sleep 1
 
@@ -46,6 +68,12 @@ pkill -f "supervise dbus-aggregate-batteries"
 pkill -f "multilog .* /var/log/dbus-aggregate-batteries"
 pkill -f "python .*/dbus-aggregate-batteries/dbus-aggregate-batteries.py"
 
+
+# create symlink to service
+if [ -L "/service/dbus-aggregate-batteries" ]; then
+	rm /service/dbus-aggregate-batteries
+fi
+ln -s /data/apps/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries
 
 
 echo
@@ -57,7 +85,7 @@ echo "CUSTOM SETTINGS: If you want to add custom settings, then check the settin
 echo "                 and add them to \"/data/apps/dbus-aggregate-batteries/config.ini\" to persist future driver updates."
 echo
 echo
-line=$(cat /data/apps/dbus-aggregate-batteries/utils.py | grep VERSION | awk -F'"' '{print "v" $2}')
+line=$(cat /data/apps/dbus-aggregate-batteries/dbus-aggregate-batteries.py | grep "VERSION =" | awk -F'"' '{print "v" $2}')
 echo "*** dbus-aggregate-batteries $line was installed. ***"
 echo
 echo
