@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import logging
 
-sys.path.append("/data/apps/dbus-aggregate-batteries/ext/velib_python")
+# add ext folder to sys.path
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext", "velib_python"))
 from dbusmonitor import DbusMonitor  # noqa: E402
 from dbus.mainloop.glib import DBusGMainLoop  # noqa: E402
 
