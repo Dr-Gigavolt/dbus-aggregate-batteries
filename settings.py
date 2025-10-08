@@ -174,7 +174,13 @@ def check_config_issue(condition: bool, message: str):
 
 # ----- Needed hardware settings -----
 NR_OF_BATTERIES: int = get_int_from_config("DEFAULT", "NR_OF_BATTERIES")
+if NR_OF_BATTERIES < 2:
+    errors_in_config.append("NR_OF_BATTERIES must be at least 2. Currently set to %d." % NR_OF_BATTERIES)
+
 NR_OF_CELLS_PER_BATTERY: int = get_int_from_config("DEFAULT", "NR_OF_CELLS_PER_BATTERY")
+if NR_OF_CELLS_PER_BATTERY < 2:
+    errors_in_config.append("NR_OF_CELLS_PER_BATTERY must be at least 2. Currently set to %d." % NR_OF_CELLS_PER_BATTERY)
+
 NR_OF_MPPTS: int = get_int_from_config("DEFAULT", "NR_OF_MPPTS")
 
 
@@ -223,7 +229,7 @@ CELL_CHARGE_LIMITING_VOLTAGE: List[float] = get_list_from_config("DEFAULT", "CEL
 CELL_CHARGE_LIMITED_CURRENT: List[float] = get_list_from_config("DEFAULT", "CELL_CHARGE_LIMITED_CURRENT", float)
 if not CELL_CHARGE_LIMITING_VOLTAGE or len(CELL_CHARGE_LIMITING_VOLTAGE) < 2 or len(CELL_CHARGE_LIMITING_VOLTAGE) != len(CELL_CHARGE_LIMITED_CURRENT):
     if not len(CELL_CHARGE_LIMITING_VOLTAGE) == 0:
-        logging.warning("CELL_CHARGE_LIMITING_VOLTAGE is not set or has less than 2 values. Using default values.")
+        errors_in_config.append("CELL_CHARGE_LIMITING_VOLTAGE is not set or has less than 2 values. Using default values.")
     CELL_CHARGE_LIMITING_VOLTAGE = [
         MIN_CELL_VOLTAGE,
         MIN_CELL_VOLTAGE + 0.05,
@@ -233,7 +239,7 @@ if not CELL_CHARGE_LIMITING_VOLTAGE or len(CELL_CHARGE_LIMITING_VOLTAGE) < 2 or 
     ]
 if not CELL_CHARGE_LIMITED_CURRENT or len(CELL_CHARGE_LIMITED_CURRENT) < 2 or len(CELL_CHARGE_LIMITING_VOLTAGE) != len(CELL_CHARGE_LIMITED_CURRENT):
     if not len(CELL_CHARGE_LIMITED_CURRENT) == 0:
-        logging.warning("CELL_CHARGE_LIMITED_CURRENT is not set or has less than 2 values. Using default values.")
+        errors_in_config.append("CELL_CHARGE_LIMITED_CURRENT is not set or has less than 2 values. Using default values.")
     CELL_CHARGE_LIMITED_CURRENT = [0.2, 1, 1, 0.1, 0]
 
 CELL_DISCHARGE_LIMITING_VOLTAGE: List[float] = get_list_from_config("DEFAULT", "CELL_DISCHARGE_LIMITING_VOLTAGE", float)
@@ -244,7 +250,7 @@ if (
     or len(CELL_DISCHARGE_LIMITING_VOLTAGE) != len(CELL_DISCHARGE_LIMITED_CURRENT)
 ):
     if not len(CELL_DISCHARGE_LIMITING_VOLTAGE) == 0:
-        logging.warning("CELL_DISCHARGE_LIMITING_VOLTAGE is not set or has less than 2 values. Using default values.")
+        errors_in_config.append("CELL_DISCHARGE_LIMITING_VOLTAGE is not set or has less than 2 values. Using default values.")
     CELL_DISCHARGE_LIMITING_VOLTAGE = [
         MIN_CELL_VOLTAGE,
         MIN_CELL_VOLTAGE + 0.1,
@@ -252,7 +258,7 @@ if (
     ]
 if not CELL_DISCHARGE_LIMITED_CURRENT or len(CELL_DISCHARGE_LIMITED_CURRENT) < 2 or len(CELL_DISCHARGE_LIMITING_VOLTAGE) != len(CELL_DISCHARGE_LIMITED_CURRENT):
     if not len(CELL_DISCHARGE_LIMITED_CURRENT) == 0:
-        logging.warning("CELL_DISCHARGE_LIMITED_CURRENT is not set or has less than 2 values. Using default values.")
+        errors_in_config.append("CELL_DISCHARGE_LIMITED_CURRENT is not set or has less than 2 values. Using default values.")
     CELL_DISCHARGE_LIMITED_CURRENT = [0, 0.05, 1]
 
 
@@ -260,3 +266,22 @@ if not CELL_DISCHARGE_LIMITED_CURRENT or len(CELL_DISCHARGE_LIMITED_CURRENT) < 2
 KEEP_MAX_CVL: bool = get_bool_from_config("DEFAULT", "KEEP_MAX_CVL")
 SEND_CELL_VOLTAGES: int = get_int_from_config("DEFAULT", "SEND_CELL_VOLTAGES")
 LOG_PERIOD: int = get_int_from_config("DEFAULT", "LOG_PERIOD")
+
+
+# print errors and exit if there are any
+if errors_in_config:
+    logging.error("Errors in config file:")
+
+    for error in errors_in_config:
+        logging.error(f"|- {error}")
+
+    logging.error("")
+    logging.error("Please fix the errors in the config file and restart the program.")
+    sleep(60)
+    sys.exit(1)
+
+logging.info("========== Settings ==========")
+logging.info("|- NR_OF_BATTERIES: %d" % NR_OF_BATTERIES)
+logging.info("|- NR_OF_CELLS_PER_BATTERY: %d" % NR_OF_CELLS_PER_BATTERY)
+logging.info("|- UPDATE_INTERVAL_FIND_DEVICES: %d s" % UPDATE_INTERVAL_FIND_DEVICES)
+logging.info("|- UPDATE_INTERVAL_DATA: %d s" % UPDATE_INTERVAL_DATA)
