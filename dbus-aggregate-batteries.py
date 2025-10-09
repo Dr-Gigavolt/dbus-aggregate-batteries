@@ -1010,12 +1010,14 @@ class DbusAggBatService(object):
                     shunt_current = self._dbusMon.dbusmon.get_value(self._smartShunt_list[i], "/Dc/0/Current")
                     if shunt_current is None:
                         raise ValueError(f"SmartShunt {self._smartShunt_list[i]} returns None as current")
-                # SmartShunt is monitored as a battery
-                if i < self._num_battery_shunts:
-                    Current_SHUNTS += shunt_current
-                # SmartShunt is in DC metering mode
-                else:
-                    Current_SHUNTS -= shunt_current
+
+                    # SmartShunt is monitored as a battery
+                    if i < self._num_battery_shunts:
+                        Current_SHUNTS += shunt_current
+                    # SmartShunt is in DC metering mode
+                    else:
+                        Current_SHUNTS -= shunt_current
+
             except Exception as err:
                 (
                     exception_type,
