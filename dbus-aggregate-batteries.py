@@ -115,7 +115,8 @@ class DbusAggBatService(object):
             logging.info("Initial Ah read from file: %.0fAh" % (self._ownCharge))
         except Exception:
             logging.error("Charge file read error. Exiting...")
-            sys.exit()
+            tt.sleep(60)
+            sys.exit(1)
 
         # read the day of the last balancing from text file
         if settings.OWN_CHARGE_PARAMETERS:
@@ -135,7 +136,8 @@ class DbusAggBatService(object):
                 logging.info("Batteries balanced %d days ago." % time_unbalanced)
             except Exception:
                 logging.error("Last balancing file read error. Exiting...")
-                sys.exit()
+                tt.sleep(60)
+                sys.exit(1)
 
         # Create the management objects, as specified in the ccgx dbus-api document
         self._dbusservice.add_path("/Mgmt/ProcessName", __file__)
@@ -327,7 +329,8 @@ class DbusAggBatService(object):
             return True
         else:
             logging.error("com.victronenergy.settings not found. Exiting...")
-            sys.exit()
+            tt.sleep(60)
+            sys.exit(1)
 
     # #####################################################################
     # #####################################################################
@@ -457,7 +460,8 @@ class DbusAggBatService(object):
                             )
                             logging.error("        |- Cells specified in config file: %d" % (settings.NR_OF_CELLS_PER_BATTERY))
                             logging.error("Exiting...")
-                            sys.exit()
+                            tt.sleep(60)
+                            sys.exit(1)
 
                         # end of section
 
@@ -501,7 +505,8 @@ class DbusAggBatService(object):
                                             shunt_id + 1,
                                             settings.USE_SMARTSHUNTS[shunt_id],
                                         )
-                                        sys.exit()
+                                        tt.sleep(60)
+                                        sys.exit(1)
 
                                     # if a shunt has been matched as one the user defined and we haven't included it
                                     # yet, we can get out of this loop
@@ -585,7 +590,8 @@ class DbusAggBatService(object):
             else:
                 print(self._batteries_dict)
                 logging.error("Required number of batteries not found. Exiting...")
-            sys.exit()
+            tt.sleep(60)
+            sys.exit(1)
 
     # #########################################################################
     # #########################################################################
@@ -625,7 +631,8 @@ class DbusAggBatService(object):
                     return True
                 else:
                     logging.error("Multi/Quattro not found. Exiting...")
-                    sys.exit()
+                    tt.sleep(60)
+                    sys.exit(1)
 
         if settings.NR_OF_MPPTS > 0:
             self._searchTrials = 1
@@ -679,7 +686,8 @@ class DbusAggBatService(object):
             return True
         else:
             logging.error("Required number of MPPTs not found. Exiting...")
-            sys.exit()
+            tt.sleep(60)
+            sys.exit(1)
 
     # #################################################################################
     # #################################################################################
@@ -901,7 +909,8 @@ class DbusAggBatService(object):
             logging.error("Read trial nr. %d" % self._readTrials)
             if self._readTrials > settings.READ_TRIALS:
                 logging.error("DBus read failed. Exiting...")
-                sys.exit()
+                tt.sleep(60)
+                sys.exit(1)
             else:
                 # next call allowed
                 return True
@@ -1024,7 +1033,8 @@ class DbusAggBatService(object):
                 else:
                     self._readTrials += 1
                     if self._readTrials > settings.READ_TRIALS:
-                        sys.exit()
+                        tt.sleep(60)
+                        sys.exit(1)
                     else:
                         # next call allowed
                         return True
