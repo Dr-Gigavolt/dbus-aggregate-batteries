@@ -70,6 +70,9 @@ class DbusAggBatService(object):
         self._smartShunt_list = []
         """ list of dbus services of SmartShunts, if found """
 
+        # Initialize tread as None
+        self._dbusMon = None
+
         # the number of SmartShunts at the beginning of _smartShunt_list that are in the
         # battery service (dc_load are listed behind)
         self._num_battery_shunts = 0
@@ -261,12 +264,16 @@ class DbusAggBatService(object):
         self._dbusservice.add_path("/Io/AllowToDischarge", None, writeable=True)
         self._dbusservice.add_path("/Io/AllowToBalance", None, writeable=True)
 
+        x = Thread(target=self._startMonitor)
+        x.start()
+
+        # wait that Dbus monitor is running else there is no data
+        while self._dbusMon is None:
+            tt.sleep(1)
+
         # register VeDbusService after all paths where added
         logging.info("### Registering VeDbusService")
         self._dbusservice.register()
-
-        x = Thread(target=self._startMonitor)
-        x.start()
 
         # search com.victronenergy.settings
         GLib.timeout_add(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_settings)
@@ -278,8 +285,9 @@ class DbusAggBatService(object):
     # #############################################################################################################
 
     def _startMonitor(self):
-        logging.info("Starting battery monitor")
+        logging.info("Starting dbusmonitor...")
         self._dbusMon = DbusMon()
+        logging.info("dbusmonitor started")
 
     # ####################################################################
     # ####################################################################
