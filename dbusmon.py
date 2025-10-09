@@ -133,7 +133,7 @@ class DbusMon:
             },
         }
 
-        self.dbusmon = DbusMonitor(self.monitorlist)
+        self.dbusmon = DbusMonitor(self.monitorlist, ignoreServices=["com.victronenergy.battery.aggregate"])
 
     def print_values(self, service, mon_list):
         for path in self.monitorlist[mon_list]:
