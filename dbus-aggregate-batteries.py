@@ -103,8 +103,8 @@ class DbusAggBatService(object):
         self._lastBalancing = 0
         # set if the CVL needs to be reduced due to peaking
         self._dynamicCVL = False
-        # measure logging period in seconds
-        self._logTimer = 0
+        # last timestamp then the log was printed
+        self._logLastPrintTimeStamp = 0
 
         # read initial charge from text file
         try:
@@ -1326,24 +1326,21 @@ class DbusAggBatService(object):
         # ################ Periodic logging ########################
         # ##########################################################
 
-        if settings.LOG_PERIOD > 0:
-            if self._logTimer < settings.LOG_PERIOD:
-                self._logTimer += 1
-            else:
-                self._logTimer = 0
-                logging.info("Repetitive logging:")
-                logging.info("  CVL: %.1fV, CCL: %.0fA, DCL: %.0fA" % (MaxChargeVoltage, MaxChargeCurrent, MaxDischargeCurrent))
-                logging.info("  Bat. voltage: %.1fV, Bat. current: %.0fA, SoC: %.1f%%, Balancing state: %d" % (Voltage, Current, Soc, self._balancing))
-                logging.info(
-                    "  Min. cell voltage: %s: %.3fV, Max. cell voltage: %s: %.3fV, difference: %.3fV"
-                    % (
-                        MinVoltageCellId,
-                        MinCellVoltage,
-                        MaxVoltageCellId,
-                        MaxCellVoltage,
-                        MaxCellVoltage - MinCellVoltage,
-                    )
+        if settings.LOG_PERIOD > 0 and int(tt.time()) - self._logLastPrintTimeStamp >= settings.LOG_PERIOD:
+            self._logLastPrintTimeStamp = int(tt.time())
+            logging.info(f"Repetitive logging (every {settings.LOG_PERIOD}s)")
+            logging.info("|- CVL: %.1fV, CCL: %.0fA, DCL: %.0fA" % (MaxChargeVoltage, MaxChargeCurrent, MaxDischargeCurrent))
+            logging.info("|- Bat. voltage: %.1fV, Bat. current: %.0fA, SoC: %.1f%%, Balancing state: %d" % (Voltage, Current, Soc, self._balancing))
+            logging.info(
+                "|- Min. cell voltage: %s: %.3fV, Max. cell voltage: %s: %.3fV, difference: %.3fV"
+                % (
+                    MinVoltageCellId,
+                    MinCellVoltage,
+                    MaxVoltageCellId,
+                    MaxCellVoltage,
+                    MaxCellVoltage - MinCellVoltage,
                 )
+            )
 
         return True
 
