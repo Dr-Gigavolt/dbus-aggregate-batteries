@@ -5,7 +5,7 @@ Many thanks to all contibutors for their help. The newest and most substantial c
 Mr-Manuel:
 - cleaning up the code
 - making compatible with the new Venus OS
-- making install and controll shell scripts
+- making install and control shell scripts
 - introducing config.ini which is not overwritten on update
 
 atillac:
@@ -27,7 +27,7 @@ I deleted releases after July 7-th 2025 because there were issues with new insta
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
 ## History
-I, a hardware engineer with limited software skills, wrote the dbus-aggregate-batteries as an emergency solution after finishing my two LTO batteries in 2022 and realizing that there was no driver enabling the Victron system to control more than one serial battery. The dbus-serial-battery was already available (maintained by Louisvdw that time) so I wrote very simple tool to collect the data of all battery instances on dbus, combine them and transmit as a single battery. Than I added my calculation approach which can be activated optionally. Later many contributors joined the project and implemented their ideas.
+I, a hardware engineer with limited software skills, wrote the dbus-aggregate-batteries as an emergency solution after finishing my two LTO batteries in 2022 and realizing that there was no driver enabling the Victron system to control more than one serial battery. The dbus-serial-battery was already available (maintained by Louisvdw that time) so I wrote a very simple tool to collect the data of all battery instances on dbus, combine them and transmit as a single battery. Than I added my calculation approach which can be activated optionally. Later many contributors joined the project and implemented their ideas.
 
 ## Attention
 This tool is offered "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in `config.ini`. We extendeded the description after some users misunderstood it. Please execute command dbus-spy on your Venus OS and review all paths transmitted by Serial Battery instances.
@@ -91,7 +91,7 @@ If you wish to combine the charger control parameters (`CVL - Charge Voltage Lim
 If `OWN_CHARGE_PARAMETERS = True`, the charging and discharging is controlled by the AggregateBatteries.
 In combination with `OWN_CHARGE_PARAMETERS = False` you need to set up the charge counter resetting values `MAX_CELL_VOLTAGE_SOC_FULL` and `MIN_CELL_VOLTAGE_SOC_EMPTY`
 
-In contrast to dbus-serialbattery driver, I don't use the Bulk-Absorption-Float lead-acid-like algorithm. The LTO cells used by me are very robust and don't suffer at full charge voltage for longer periods of time. Of course you shouldn't keep them above `2.5V`, although max. voltage according to datasheet is `2.8V`. In case of constant voltage charging they are full at about `2.45V ... 2.5V`. But most of you use LFP cells, therefore I use another approach. For LFP you have to set up the cell voltages according to your experience or literature.
+In contrast to dbus-serialbattery driver, I don't use the Bulk-Absorption-Float lead-acid-like algorithm. The LTO cells used by me are very robust and don't suffer at full charge voltage for longer periods of time. Of course you shouldn't keep them above `2.5V`, although max. voltage according to datasheet is `2.8V`. In case of constant voltage charging they are full at about `2.45V ... 2.5V`. Mr-Manuel made config.ini also for LFP cells, but I have no experience with them.
 
 If the nominal charge voltage in `CHARGE_VOLTAGE_LIST` is set below the `BALANCING_VOLTAGE` (regular charging below 100% SoC), every `BALANCING_REPETITION` days full charge and balancing with `BALANCING_VOLTAGE` occurs. If not successful at given day (`BALANCING_VOLTAGE` not reached or cell voltage difference remains above `CELL_DIFF_MAX`), the next trial is done on the following day. The `BALANCING_VOLTAGE` is kept as long as the solar power is available. Then, when the cells are discharged from `BALANCING_VOLTAGE` down to `CHARGE_VOLTAGE` by own consumption, the process finishes. This algorithm avoids 100% charge during most of the days in order to prolong the battery life. In contrast, the Bulk-Absorption-Float charges the battery to 100% every day, keeps the voltage for a couple of minutes and then discharges the excessive charge into the grid. If you prefer it, just set `OWN_CHARGE_PARAMETERS = False` and use the calculation of the dbus-serialbattery.
 
