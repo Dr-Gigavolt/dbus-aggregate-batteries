@@ -1,6 +1,22 @@
-## Attention - troubles with new Venus OS (probably since 3.60)
+## Version 4.0.20251009
 
-I deleted releases after July 7-th 2025 because there were issues with new installation stcripts. I apologize I have no time to care about it and hope in help of other contributors. If you have upgraded Victron OS to v.3.6x and have incompatibility issues with installation path /data (otherwise don't touch running system) please:
+Many thanks to all contibutors for their help. The newest and most substantial contributions are from:
+
+Mr-Manuel:
+- cleaning up the code
+- making compatible with the new Venus OS
+- making install and controll shell scripts
+- introducing config.ini which is not overwritten on update
+
+atillac:
+- many options with Smart Shunts
+
+We very appreciate your testing and reporting before we file a new release.
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+### Troubles with previous version with new Venus OS
+
+I deleted releases after July 7-th 2025 because there were issues with new installation stcripts. If you need to make make the release 3.5.20250707 running after upgrade of the Venus OS, please proceed as follows:
 
 - copy the dbus-aggregate-batteries directory into /data/app manually
 - in dbus-aggregate-batteries/aggregatebatteries.py change all absolute paths /data to /data/apps
@@ -8,24 +24,20 @@ I deleted releases after July 7-th 2025 because there were issues with new insta
 - remove the old symbolic link /service/dbus-aggregate-batteries
 - create new symbolic link: ln -s /data/apps/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries
 - if you need shell scripts, change paths there to /data/apps as well. In this case correct the path to reinstall-local.sh in /data/rc.local. If you don't need them, you can delete them as well as the entry in rc.local. I recommend to keep and correct at least restart.sh and restart_dbus-serial-battery.sh, they are useful for debugging.
-
-Other and perhaps the most simple temporary solution to make your system running is the release 3.5.20250707 with Venus OS 3.5x (I still run 3.55)
-
-Thanks for your understanding.
-
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-Attention: This is my first experience with the Victron system. I offer it "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in `config.ini`. I extended the description after some users misunderstood it. Please execute command dbus-spy on your Venus OS and review all paths transmitted by Serial Battery instances.
+## History
+I, a hardware engineer with limited software skills, wrote the dbus-aggregate-batteries as an emergency solution after finishing my two LTO batteries in 2022 and realizing that there was no driver enabling the Victron system to control more than one serial battery. The dbus-serial-battery was already available (maintained by Louisvdw that time) so I wrote very simple tool to collect the data of all battery instances on dbus, combine them and transmit as a single battery. Than I added my calculation approach which can be activated optionally. Later many contributors joined the project and implemented their ideas.
+
+## Attention
+This tool is offered "as it is" for persons with sufficient knowledge and experience and under exclusion of any kind of liability. You should review and understand the code before using it. Please read carefully the explanation of all parameters in `config.ini`. We extendeded the description after some users misunderstood it. Please execute command dbus-spy on your Venus OS and review all paths transmitted by Serial Battery instances.
 
 ### My hardware
 - 3x MultiPlus-II 48/5000/70-50
 - 1x SmartSolar MPPT VE.Can 250/100
 - 1x Fronius Symo 15.0-3-M
 - 2x LTO batteries 24S x 5P with JK BMS 2A24S20P
-
-Please report the bugs and propose improvements. Many thanks to all who already participated. According previous experience I prefer if you attach a piece of code instead of creating a merge request. And please understand, that I'm not able to include all proposals, this would make the program too complex and difficult to maintain.
-
-#### Many thanks to Mr-Manuel for adding install scripts and improving logging
+Please note I have nothing else and cannot offer support with other hardware.
 
 ## Installation
 - Execute these commands to download the driver from the internet and install it:
