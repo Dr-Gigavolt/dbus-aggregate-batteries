@@ -363,7 +363,7 @@ backup_config
 
 
 # get the name of the folder in the zip file
-if [ -z "$branch" ]; then
+if [ -n "$branch" ]; then
     zip_root_folder=$(unzip -l /tmp/dbus-aggregate-batteries.zip | awk '{print $4}' | grep -oE '^[^/]+/' | head -n 1 | sed 's:/$::')
 fi
 
