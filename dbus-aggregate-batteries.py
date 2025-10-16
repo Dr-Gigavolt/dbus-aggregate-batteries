@@ -894,7 +894,6 @@ class DbusAggBatService(object):
             MinCellVoltage = MinCellVoltage_dict[MinVoltageCellId]
 
         except Exception as err:
-            self._readTrials += 1
             (
                 exception_type,
                 exception_object,
@@ -907,6 +906,7 @@ class DbusAggBatService(object):
             logging.error("Error: %s." % (err))
             logging.error("Occured during step %s, Battery %s." % (step, i))
             logging.error("Read trial nr. %d" % self._readTrials)
+            self._readTrials += 1
             if self._readTrials > settings.READ_TRIALS:
                 logging.error("DBus read failed. Exiting...")
                 tt.sleep(60)
