@@ -893,7 +893,7 @@ class DbusAggBatService(object):
             MinVoltageCellId = min(MinCellVoltage_dict, key=MinCellVoltage_dict.get)
             MinCellVoltage = MinCellVoltage_dict[MinVoltageCellId]
 
-        except Exception as err:
+        except Exception:
             (
                 exception_type,
                 exception_object,
