@@ -36,7 +36,7 @@ from threading import Thread
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "4.0.20251009"
+VERSION = "4.0.20251016-dev"
 
 
 class SystemBus(dbus.bus.BusConnection):
@@ -61,7 +61,7 @@ class DbusAggBatService(object):
         """ dictionary with battery name as key and dbus service as value """
 
         self._multi = None
-        """ dbus service of Multi/Quattro, if found """
+        """ dbus service of MultiPlus/Quattro, if found """
 
         self._mppts_list = []
         """ list of dbus services of MPPTs, if found """
@@ -81,9 +81,9 @@ class DbusAggBatService(object):
         self._MaxChargeVoltage_old = 0
         self._MaxChargeCurrent_old = 0
         self._MaxDischargeCurrent_old = 0
-        # Keep track of Multi/Quattro connection status
+        # Keep track of MultiPlus/Quattro connection status
         # so connect/disconnect notice is output only once
-        # - prevents log overflowing when Multi/Quattro is
+        # - prevents log overflowing when MultiPlus/Quattro is
         #   switched off for longer periods of time (i.e. in mobile applications)
         self._multi_connected = True
         # implementing hysteresis for allowing discharge
@@ -565,7 +565,7 @@ class DbusAggBatService(object):
                 Soc /= InstalledCapacity
             if settings.CURRENT_FROM_VICTRON:
                 self._searchTrials = 1
-                # if current from Victron stuff search multi/quattro on DBus
+                # if current from Victron stuff search MultiPlus/Quattro on DBus
                 GLib.timeout_add(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_multis)
             else:
                 self._timeOld = tt.time()
@@ -600,12 +600,12 @@ class DbusAggBatService(object):
     # #########################################################################
 
     def _find_multis(self):
-        # only search for Multi/Quattro devices if that is specified, possible use-cases:
-        # - no Multi/Quattro device installed (examples: a pure DC system, a different inverter/charger is used)
-        # - current detection of Multi/Quattro is not wanted (i.e. SmartShunts are used instead)
+        # only search for MultiPlus/Quattro devices if that is specified, possible use-cases:
+        # - no MultiPlus/Quattro device installed (examples: a pure DC system, a different inverter/charger is used)
+        # - current detection of MultiPlus/Quattro is not wanted (i.e. SmartShunts are used instead)
         # may still want to aggregate their batteries when using no inverter/no Victron inverter/charger)
         if len(settings.MULTI_KEYWORD) > 0:
-            logging.info("Searching Multi/Quattro VEbus: Trial Nr. %d" % self._searchTrials)
+            logging.info("Searching MultiPlus/Quattro VEbus: Trial Nr. %d" % self._searchTrials)
             try:
                 for service in self._dbusConn.list_names():
                     if settings.MULTI_KEYWORD in service:
@@ -623,14 +623,14 @@ class DbusAggBatService(object):
 
                 pass
 
-            logging.info("> 1 Multi/Quattro.")
+            logging.info("> 1 MultiPlus/Quattro found.")
             if self._multi is None:
                 if self._searchTrials < settings.SEARCH_TRIALS:
                     self._searchTrials += 1
                     # next trial
                     return True
                 else:
-                    logging.error("Multi/Quattro not found. Exiting...")
+                    logging.error("MultiPlus/Quattro not found. Exiting...")
                     tt.sleep(60)
                     sys.exit(1)
 
@@ -901,9 +901,9 @@ class DbusAggBatService(object):
             ) = sys.exc_info()
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logging.debug(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
-
-            logging.error("Error: %s." % (err))
+            locals_at_error = exception_traceback.tb_frame.f_locals
+            logging.error(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logging.error(f"Local variables at error: {locals_at_error}")
             logging.error("Occured during step %s, Battery %s." % (step, i))
             logging.error("Read trial nr. %d" % self._readTrials)
             self._readTrials += 1
@@ -965,26 +965,26 @@ class DbusAggBatService(object):
 
         if settings.CURRENT_FROM_VICTRON:
             success = True
-            # variable to accumulate currents measured by Victron stuff (i.e. Multi/Quattro, SmartShunts, MPPTs)
+            # variable to accumulate currents measured by Victron stuff (i.e. MultiPlus/Quattro, SmartShunts, MPPTs)
             Current_VE = 0
             try:
-                # Read Multi/Quattro data only when one is used and has been found
-                # Multi/Quattro `Connected` value will go to 0 if it exists but is switch off (VE-BUS remains connected)
+                # Read MultiPlus/Quattro data only when one is used and has been found
+                # MultiPlus/Quattro `Connected` value will go to 0 if it exists but is switch off (VE-BUS remains connected)
                 # by the user (either via Digital Multi Control, Cerbo, VRM, or the device itself)
                 if self._multi is not None:
                     Multi_Connected = self._dbusMon.dbusmon.get_value(self._multi, "/Connected")
-                    # Read current only when Multi/Quattro is connected
+                    # Read current only when MultiPlus/Quattro is connected
                     if Multi_Connected > 0:
-                        # get DC current of multi/quattro (or system of them)
+                        # get DC current of multiPlus/quattro (or system of them)
                         Current_VE = self._dbusMon.dbusmon.get_value(self._multi, "/Dc/0/Current")
-                        # Output to log that Multi/Quattro is connected again
+                        # Output to log that MultiPlus/Quattro is connected again
                         if not self._multi_connected:
-                            logging.info("Multi/Quattro is connected")
+                            logging.info("MultiPlus/Quattro is connected")
                         self._multi_connected = True  # keep track of state to notice if state changes at next round
                     else:
-                        # Output to log when Multi/Quattro state changed from connected (at last read) to not connected
+                        # Output to log when MultiPlus/Quattro state changed from connected (at last read) to not connected
                         if self._multi_connected:
-                            logging.info("Multi/Quattro is not connected")
+                            logging.info("MultiPlus/Quattro is not connected")
                         self._multi_connected = False  # keep track of state to notice if state changes at next round
 
                 for i in range(settings.NR_OF_MPPTS):
