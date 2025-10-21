@@ -565,7 +565,7 @@ class DbusAggBatService(object):
         # make sure the correct number of batteries and SmartShunts has been found
         if (batteriesCount == settings.NR_OF_BATTERIES) and (len(self._smartShunt_list) >= NR_OF_SMARTSHUNTS):
             if self._ownCharge < 0:
-                self._ownCharge = Soc
+                self._ownCharge = Soc / 100.0
                 Soc /= InstalledCapacity
             if settings.CURRENT_FROM_VICTRON:
                 self._searchTrials = 1
