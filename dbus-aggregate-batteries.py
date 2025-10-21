@@ -34,6 +34,10 @@ from threading import Thread
 
 # add ext folder to sys.path
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
+
+# optionally from victron
+# sys.path.insert(1, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
+
 from vedbus import VeDbusService  # noqa: E402
 
 VERSION = "4.0.20251016-dev"
@@ -115,7 +119,7 @@ class DbusAggBatService(object):
             logging.info("Initial Ah read from file: %.0fAh" % (self._ownCharge))
         except Exception:
             logging.error("Charge file read error. Exiting...")
-            tt.sleep(60)
+            tt.sleep(settings.TIME_BEFORE_RESTART)
             sys.exit(1)
 
         # read the day of the last balancing from text file
@@ -136,7 +140,7 @@ class DbusAggBatService(object):
                 logging.info("Batteries balanced %d days ago." % time_unbalanced)
             except Exception:
                 logging.error("Last balancing file read error. Exiting...")
-                tt.sleep(60)
+                tt.sleep(settings.TIME_BEFORE_RESTART)
                 sys.exit(1)
 
         # Create the management objects, as specified in the ccgx dbus-api document
@@ -278,7 +282,7 @@ class DbusAggBatService(object):
         self._dbusservice.register()
 
         # search com.victronenergy.settings
-        GLib.timeout_add(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_settings)
+        GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_settings)
 
     # #############################################################################################################
     # #############################################################################################################
@@ -320,7 +324,7 @@ class DbusAggBatService(object):
         if self._settings is not None:
             self._searchTrials = 1
             # search batteries on DBus if present
-            GLib.timeout_add(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_batteries)
+            GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_batteries)
             # all OK, stop calling this function
             return False
         elif self._searchTrials < settings.SEARCH_TRIALS:
@@ -329,7 +333,7 @@ class DbusAggBatService(object):
             return True
         else:
             logging.error("com.victronenergy.settings not found. Exiting...")
-            tt.sleep(60)
+            tt.sleep(settings.TIME_BEFORE_RESTART)
             sys.exit(1)
 
     # #####################################################################
@@ -460,7 +464,7 @@ class DbusAggBatService(object):
                             )
                             logging.error("        |- Cells specified in config file: %d" % (settings.NR_OF_CELLS_PER_BATTERY))
                             logging.error("Exiting...")
-                            tt.sleep(60)
+                            tt.sleep(settings.TIME_BEFORE_RESTART)
                             sys.exit(1)
 
                         # end of section
@@ -505,7 +509,7 @@ class DbusAggBatService(object):
                                             shunt_id + 1,
                                             settings.USE_SMARTSHUNTS[shunt_id],
                                         )
-                                        tt.sleep(60)
+                                        tt.sleep(settings.TIME_BEFORE_RESTART)
                                         sys.exit(1)
 
                                     # if a shunt has been matched as one the user defined and we haven't included it
@@ -565,12 +569,12 @@ class DbusAggBatService(object):
                 Soc /= InstalledCapacity
             if settings.CURRENT_FROM_VICTRON:
                 self._searchTrials = 1
-                # if current from Victron stuff search MultiPlus/Quattro on DBus
-                GLib.timeout_add(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_multis)
+                # if current from Victron stuff search multi/quattro on DBus
+                GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_multis)
             else:
                 self._timeOld = tt.time()
                 # if current from BMS start the _update loop
-                GLib.timeout_add(settings.UPDATE_INTERVAL_DATA, self._update)
+                GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
 
             # all OK, stop calling this function
             return False
@@ -588,9 +592,9 @@ class DbusAggBatService(object):
                     NR_OF_SMARTSHUNTS,
                 )
             else:
-                print(self._batteries_dict)
+                logging.info(self._batteries_dict)
                 logging.error("Required number of batteries not found. Exiting...")
-            tt.sleep(60)
+            tt.sleep(settings.TIME_BEFORE_RESTART)
             sys.exit(1)
 
     # #########################################################################
@@ -630,18 +634,18 @@ class DbusAggBatService(object):
                     # next trial
                     return True
                 else:
-                    logging.error("MultiPlus/Quattro not found. Exiting...")
-                    tt.sleep(60)
+                    logging.error("Multi/Quattro not found. Exiting...")
+                    tt.sleep(settings.TIME_BEFORE_RESTART)
                     sys.exit(1)
 
         if settings.NR_OF_MPPTS > 0:
             self._searchTrials = 1
             # search MPPTs on DBus if present
-            GLib.timeout_add(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_mppts)
+            GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_mppts)
         else:
             self._timeOld = tt.time()
             # if no MPPTs start the _update loop
-            GLib.timeout_add(settings.UPDATE_INTERVAL_DATA, self._update)
+            GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
 
         # all OK, stop calling this function
         return False
@@ -677,7 +681,7 @@ class DbusAggBatService(object):
         logging.info("> %d MPPT(s) found." % (mpptsCount))
         if mpptsCount == settings.NR_OF_MPPTS:
             self._timeOld = tt.time()
-            GLib.timeout_add(settings.UPDATE_INTERVAL_DATA, self._update)
+            GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
             # all OK, stop calling this function
             return False
         elif self._searchTrials < settings.SEARCH_TRIALS:
@@ -686,7 +690,7 @@ class DbusAggBatService(object):
             return True
         else:
             logging.error("Required number of MPPTs not found. Exiting...")
-            tt.sleep(60)
+            tt.sleep(settings.TIME_BEFORE_RESTART)
             sys.exit(1)
 
     # #################################################################################
@@ -909,7 +913,7 @@ class DbusAggBatService(object):
             self._readTrials += 1
             if self._readTrials > settings.READ_TRIALS:
                 logging.error("DBus read failed. Exiting...")
-                tt.sleep(60)
+                tt.sleep(settings.TIME_BEFORE_RESTART)
                 sys.exit(1)
             else:
                 # next call allowed
@@ -1035,7 +1039,7 @@ class DbusAggBatService(object):
                 else:
                     self._readTrials += 1
                     if self._readTrials > settings.READ_TRIALS:
-                        tt.sleep(60)
+                        tt.sleep(settings.TIME_BEFORE_RESTART)
                         sys.exit(1)
                     else:
                         # next call allowed
@@ -1388,7 +1392,7 @@ def main():
 
         logging.error("")
         logging.error("Please fix the errors in the config file and restart the program.")
-        tt.sleep(60)
+        tt.sleep(settings.TIME_BEFORE_RESTART)
         sys.exit(1)
 
     logging.info("========== Settings ==========")
