@@ -363,9 +363,8 @@ backup_config
 
 
 # get the name of the folder in the zip file
-if [ -z "$branch" ]; then
-    zip_root_folder=$(unzip -l /tmp/dbus-aggregate-batteries.zip | awk '{print $4}' | grep -oE '^[^/]+/' | head -n 1 | sed 's:/$::')
-fi
+zip_root_folder=$(unzip -l /tmp/dbus-aggregate-batteries.zip | awk '{print $4}' | grep -oE '^[^/]+/' | head -n 1 | sed 's:/$::')
+
 
 # extract archive
 # driver >= v4.0.0
@@ -401,10 +400,10 @@ fi
 
 # move driver to the correct location
 # driver >= v4.0.0
-if [ -d "/tmp/dbus-aggregate-batteries" ]; then
+if [ -f "/tmp/dbus-aggregate-batteries/enable.sh" ]; then
     mv /tmp/dbus-aggregate-batteries /data/apps
 # driver < v4.0.0
-elif [ -d "/tmp/dbus-aggregate-batteries" ]; then
+elif [ -f "/tmp/dbus-aggregate-batteries/reinstall-local.sh" ]; then
     mv /tmp/dbus-aggregate-batteries /data
 else
     echo "ERROR: Something went wrong during moving the files from the temporary ZIP location to the final location. Please try again."
