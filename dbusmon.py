@@ -8,7 +8,7 @@ import logging
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext", "velib_python"))
 
 # optionally from victron
-#sys.path.insert(1, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
+# sys.path.insert(1, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 
 from dbusmonitor import DbusMonitor  # noqa: E402
 from dbus.mainloop.glib import DBusGMainLoop  # noqa: E402

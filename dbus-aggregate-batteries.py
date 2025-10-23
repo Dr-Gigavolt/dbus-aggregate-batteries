@@ -40,7 +40,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "4.0.20251016-dev"
+VERSION = "4.0.20251023-dev"
 
 
 class SystemBus(dbus.bus.BusConnection):
