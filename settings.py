@@ -225,6 +225,8 @@ CELL_DIFF_MAX: float = get_float_from_config("DEFAULT", "CELL_DIFF_MAX")
 BATTERY_EFFICIENCY: float = get_float_from_config("DEFAULT", "BATTERY_EFFICIENCY")
 MAX_CHARGE_CURRENT: int = get_int_from_config("DEFAULT", "MAX_CHARGE_CURRENT")
 MAX_DISCHARGE_CURRENT: int = get_int_from_config("DEFAULT", "MAX_DISCHARGE_CURRENT")
+CCL_SAFE: bool = get_bool_from_config("DEFAULT", "CCL_SAFE")
+DCL_SAFE: bool = get_bool_from_config("DEFAULT", "DCL_SAFE")
 
 CELL_CHARGE_LIMITING_VOLTAGE: List[float] = get_list_from_config("DEFAULT", "CELL_CHARGE_LIMITING_VOLTAGE", float)
 CELL_CHARGE_LIMITED_CURRENT: List[float] = get_list_from_config("DEFAULT", "CELL_CHARGE_LIMITED_CURRENT", float)

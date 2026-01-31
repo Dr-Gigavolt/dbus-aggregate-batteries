@@ -1180,7 +1180,7 @@ class DbusAggBatService(object):
                 self._ownCharge = 0
 
             # manage charge current
-            if NrOfModulesBlockingCharge > 0:
+            if ((NrOfModulesBlockingCharge >= NrOfModulesOnline) and (not settings.CCL_SAFE)):
                 MaxChargeCurrent = 0
             else:
                 MaxChargeCurrent = settings.MAX_CHARGE_CURRENT * self._fn._interpolate(
@@ -1195,7 +1195,7 @@ class DbusAggBatService(object):
             elif MinCellVoltage > settings.MIN_CELL_VOLTAGE + settings.MIN_CELL_HYSTERESIS:
                 self._fullyDischarged = False
 
-            if (NrOfModulesBlockingDischarge > 0) or (self._fullyDischarged):
+            if (((NrOfModulesBlockingDischarge >= NrOfModulesOnline) and (not settings.DCL_SAFE)) or (self._fullyDischarged)):
                 MaxDischargeCurrent = 0
             else:
                 MaxDischargeCurrent = settings.MAX_DISCHARGE_CURRENT * self._fn._interpolate(
