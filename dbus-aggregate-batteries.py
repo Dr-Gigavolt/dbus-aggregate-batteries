@@ -94,9 +94,9 @@ class DbusAggBatService(object):
         # implementing hysteresis for allowing discharge
         self._fullyDischarged = False
         self._dbusConn = get_bus()
-        logging.info("### Initialise VeDbusService ")
+        logging.info("Initializing VeDbusService...")
         self._dbusservice = VeDbusService(servicename, self._dbusConn, register=False)
-        logging.info("|- Done: Init of VeDbusService ")
+        logging.info("VeDbusService initialized")
         self._timeOld = tt.time()
         # written when dynamic CVL limit activated
         self._DCfeedActive = False
@@ -279,7 +279,7 @@ class DbusAggBatService(object):
             tt.sleep(1)
 
         # register VeDbusService after all paths where added
-        logging.info("### Registering VeDbusService")
+        logging.info("Registering VeDbusService...")
         self._dbusservice.register()
 
         # search com.victronenergy.settings

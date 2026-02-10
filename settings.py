@@ -280,9 +280,3 @@ if errors_in_config:
     logging.error("Please fix the errors in the config file and restart the program.")
     sleep(60)
     sys.exit(1)
-
-logging.info("========== Settings ==========")
-logging.info("|- NR_OF_BATTERIES: %d" % NR_OF_BATTERIES)
-logging.info("|- NR_OF_CELLS_PER_BATTERY: %d" % NR_OF_CELLS_PER_BATTERY)
-logging.info("|- UPDATE_INTERVAL_FIND_DEVICES: %d s" % UPDATE_INTERVAL_FIND_DEVICES)
-logging.info("|- UPDATE_INTERVAL_DATA: %d s" % UPDATE_INTERVAL_DATA)
