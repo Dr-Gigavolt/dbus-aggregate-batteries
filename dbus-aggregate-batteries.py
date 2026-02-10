@@ -40,7 +40,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 
 from vedbus import VeDbusService  # noqa: E402
 
-VERSION = "4.0.20251023-beta"
+VERSION = "4.0.20260210-beta"
 
 
 class SystemBus(dbus.bus.BusConnection):
@@ -236,7 +236,7 @@ class DbusAggBatService(object):
         self._dbusservice.add_path("/Alarms/LowVoltage", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighVoltage", None, writeable=True)
         self._dbusservice.add_path("/Alarms/LowCellVoltage", None, writeable=True)
-        # self._dbusservice.add_path('/Alarms/HighCellVoltage', None, writeable=True)
+        self._dbusservice.add_path("/Alarms/HighCellVoltage", None, writeable=True)
         self._dbusservice.add_path("/Alarms/LowSoc", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighChargeCurrent", None, writeable=True)
         self._dbusservice.add_path("/Alarms/HighDischargeCurrent", None, writeable=True)
@@ -740,6 +740,7 @@ class DbusAggBatService(object):
         LowVoltage_alarm_list = []
         HighVoltage_alarm_list = []
         LowCellVoltage_alarm_list = []
+        HighCellVoltage_alarm_list = []
         LowSoc_alarm_list = []
         HighChargeCurrent_alarm_list = []
         HighDischargeCurrent_alarm_list = []
@@ -849,6 +850,7 @@ class DbusAggBatService(object):
                 LowVoltage_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowVoltage"))
                 HighVoltage_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighVoltage"))
                 LowCellVoltage_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowCellVoltage"))
+                HighCellVoltage_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighCellVoltage"))
                 LowSoc_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowSoc"))
                 HighChargeCurrent_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighChargeCurrent"))
                 HighDischargeCurrent_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighDischargeCurrent"))
@@ -937,6 +939,7 @@ class DbusAggBatService(object):
         LowVoltage_alarm = self._fn._max(LowVoltage_alarm_list)
         HighVoltage_alarm = self._fn._max(HighVoltage_alarm_list)
         LowCellVoltage_alarm = self._fn._max(LowCellVoltage_alarm_list)
+        HighCellVoltage_alarm = self._fn._max(HighCellVoltage_alarm_list)
         LowSoc_alarm = self._fn._max(LowSoc_alarm_list)
         HighChargeCurrent_alarm = self._fn._max(HighChargeCurrent_alarm_list)
         HighDischargeCurrent_alarm = self._fn._max(HighDischargeCurrent_alarm_list)
@@ -1302,8 +1305,7 @@ class DbusAggBatService(object):
             bus["/Alarms/LowVoltage"] = LowVoltage_alarm
             bus["/Alarms/HighVoltage"] = HighVoltage_alarm
             bus["/Alarms/LowCellVoltage"] = LowCellVoltage_alarm
-            # TODO: was now implemended in Venus OS
-            # bus['/Alarms/HighCellVoltage'] = HighCellVoltage_alarm
+            bus["/Alarms/HighCellVoltage"] = HighCellVoltage_alarm
             bus["/Alarms/LowSoc"] = LowSoc_alarm
             bus["/Alarms/HighChargeCurrent"] = HighChargeCurrent_alarm
             bus["/Alarms/HighDischargeCurrent"] = HighDischargeCurrent_alarm
