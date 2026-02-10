@@ -80,6 +80,7 @@ class DbusAggBatService(object):
         # the number of SmartShunts at the beginning of _smartShunt_list that are in the
         # battery service (dc_load are listed behind)
         self._num_battery_shunts = 0
+        self._settings = None
         self._searchTrials = 1
         self._readTrials = 1
         self._MaxChargeVoltage_old = 0
