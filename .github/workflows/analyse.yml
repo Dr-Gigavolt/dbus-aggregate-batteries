@@ -31,7 +31,8 @@ jobs:
         python-version: "3.10"
 
     - name: Perform black lint check
-      uses: psf/black@stable
+      # uses: psf/black@stable
+      uses: psf/black@25.1.0
 
     - name: Perform flake8 lint check
       uses: py-actions/flake8@v2
