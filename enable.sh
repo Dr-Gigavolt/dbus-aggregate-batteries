@@ -67,6 +67,8 @@ sleep 1
 pkill -f "supervise dbus-aggregate-batteries"
 pkill -f "multilog .* /var/log/dbus-aggregate-batteries"
 pkill -f "python .*/dbus-aggregate-batteries/dbus-aggregate-batteries.py"
+# backwards compatibility for older versions
+pkill -f "python .*/dbus-aggregate-batteries/.*.py"
 
 
 # create symlink to service
