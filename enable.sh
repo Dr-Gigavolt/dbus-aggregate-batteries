@@ -66,7 +66,9 @@ sleep 1
 # kill driver, if still running
 pkill -f "supervise dbus-aggregate-batteries"
 pkill -f "multilog .* /var/log/dbus-aggregate-batteries"
-pkill -f "python .*/dbus-aggregate-batteries/dbus-aggregate-batteries.py"
+pkill -f "python3 .*/dbus-aggregate-batteries/dbus-aggregate-batteries.py"
+# backwards compatibility for older versions
+pkill -f "python3 .*/dbus-aggregate-batteries/.*.py"
 
 
 # create symlink to service
