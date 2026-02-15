@@ -5,7 +5,7 @@ import logging
 import sys
 from pathlib import Path
 from time import sleep
-from typing import List, Any, Callable
+from typing import Dict, List, Any, Callable
 
 
 PATH_CONFIG_DEFAULT: str = "config.default.ini"
@@ -159,6 +159,53 @@ def get_list_from_config(group: str, option: str, mapper: Callable[[Any], Any] =
         return []
 
 
+def get_pairs_from_config(group: str, option: str) -> Dict[int, str]:
+    """
+    Parse a comma-separated list of INT:STRING pairs from the config file.
+
+    Example config value: "278:SER1, 277:SER2"
+    Returns: {278: "SER1", 277: "SER2"}
+
+    Returns an empty dict if the option is empty or missing.
+
+    :param group: Group in the config file
+    :param option: Option in the config file
+    :return: Dict mapping integer keys to string values
+    """
+    raw = config[group].get(option, "").strip()
+    if not raw:
+        return {}
+    result = {}
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if ":" not in item:
+            errors_in_config.append(
+                f"Invalid pair '{item}' for option '{option}' in group '{group}'. "
+                f"Expected format: VRM_INSTANCE:BATTERY_NAME"
+            )
+            continue
+        key_str, value = item.split(":", 1)
+        key_str = key_str.strip()
+        value = value.strip()
+        try:
+            key = int(key_str)
+        except ValueError:
+            errors_in_config.append(
+                f"Invalid VRM instance '{key_str}' in pair '{item}' for option '{option}'. "
+                f"Must be an integer."
+            )
+            continue
+        if not value:
+            errors_in_config.append(
+                f"Empty battery name in pair '{item}' for option '{option}'."
+            )
+            continue
+        result[key] = value
+    return result
+
+
 def check_config_issue(condition: bool, message: str):
     """
     Check a condition and append a message to the errors_in_config list if the condition is True.
@@ -206,6 +253,7 @@ CURRENT_FROM_VICTRON: bool = get_bool_from_config("DEFAULT", "CURRENT_FROM_VICTR
 USE_SMARTSHUNTS: bool = get_bool_from_config("DEFAULT", "USE_SMARTSHUNTS")
 INVERT_SMARTSHUNTS: bool = get_bool_from_config("DEFAULT", "INVERT_SMARTSHUNTS")
 IGNORE_SMARTSHUNT_ABSENCE: bool = get_bool_from_config("DEFAULT", "IGNORE_SMARTSHUNT_ABSENCE")
+SHUNT_BATTERY_PAIRS: Dict[int, str] = get_pairs_from_config("DEFAULT", "SHUNT_BATTERY_PAIRS")
 OWN_SOC: bool = get_bool_from_config("DEFAULT", "OWN_SOC")
 ZERO_SOC: bool = get_bool_from_config("DEFAULT", "ZERO_SOC")
 MAX_CELL_VOLTAGE_SOC_FULL: float = get_float_from_config("DEFAULT", "MAX_CELL_VOLTAGE_SOC_FULL")

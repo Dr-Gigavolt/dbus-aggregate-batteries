@@ -80,6 +80,10 @@ class DbusAggBatService(object):
         # the number of SmartShunts at the beginning of _smartShunt_list that are in the
         # battery service (dc_load are listed behind)
         self._num_battery_shunts = 0
+
+        # Shunt-battery pairing map: battery_name -> shunt_dbus_service
+        # Built by _find_batteries() from settings.SHUNT_BATTERY_PAIRS
+        self._shunt_pair_map = {}
         self._settings = None
         self._searchTrials = 1
         self._readTrials = 1
@@ -349,6 +353,9 @@ class DbusAggBatService(object):
         # SmartShunt list - will be populated so battery category SmartShunts are at the beginning of the list
         self._smartShunt_list = []
 
+        # Shunt-battery pairing: battery_name -> shunt_dbus_service (reset each search)
+        self._shunt_pair_map = {}
+
         # no SmartShunts in the battery category have been found yet
         self._num_battery_shunts = 0
         batteriesCount = 0
@@ -562,6 +569,58 @@ class DbusAggBatService(object):
             )
         else:
             logging.info("> %d batteries found." % (batteriesCount))
+
+        ##########################################################
+        # Build shunt-battery pairing map from SHUNT_BATTERY_PAIRS
+        ##########################################################
+        if settings.SHUNT_BATTERY_PAIRS:
+            # Build a lookup of VRM instance -> D-Bus service for SmartShunts
+            # We scan all battery services (not just _smartShunt_list) because
+            # SHUNT_BATTERY_PAIRS works independently of USE_SMARTSHUNTS.
+            shunt_vrm_to_service = {}
+            try:
+                for service in sorted(str(name) for name in self._dbusConn.list_names() if "com.victronenergy" in str(name)):
+                    if settings.BATTERY_SERVICE_NAME not in service:
+                        continue
+                    pn = self._dbusMon.dbusmon.get_value(service, settings.BATTERY_PRODUCT_NAME_PATH)
+                    if pn is not None and settings.SMARTSHUNT_NAME_KEYWORD in pn:
+                        vrm_id = self._dbusMon.dbusmon.get_value(service, "/DeviceInstance")
+                        if vrm_id is not None:
+                            shunt_vrm_to_service[int(vrm_id)] = service
+            except Exception:
+                logging.debug("Exception scanning for SmartShunt VRM instances", exc_info=True)
+
+            # Match each configured pair
+            for shunt_vrm_id, battery_name in settings.SHUNT_BATTERY_PAIRS.items():
+                shunt_svc = shunt_vrm_to_service.get(shunt_vrm_id)
+                if shunt_svc is None:
+                    logging.warning(
+                        "SHUNT_BATTERY_PAIRS: SmartShunt VRM instance %d not found on D-Bus",
+                        shunt_vrm_id,
+                    )
+                    continue
+                if battery_name not in self._batteries_dict:
+                    logging.warning(
+                        "SHUNT_BATTERY_PAIRS: Battery '%s' not found (available: %s)",
+                        battery_name,
+                        ", ".join(self._batteries_dict.keys()),
+                    )
+                    continue
+                self._shunt_pair_map[battery_name] = shunt_svc
+                logging.info(
+                    "SHUNT_BATTERY_PAIRS: Paired SmartShunt %d (%s) -> Battery '%s' (%s)",
+                    shunt_vrm_id,
+                    shunt_svc,
+                    battery_name,
+                    self._batteries_dict[battery_name],
+                )
+
+            if self._shunt_pair_map:
+                logging.info(
+                    "SHUNT_BATTERY_PAIRS: %d of %d pairs active",
+                    len(self._shunt_pair_map),
+                    len(settings.SHUNT_BATTERY_PAIRS),
+                )
 
         # make sure the correct number of batteries and SmartShunts has been found
         if (batteriesCount == settings.NR_OF_BATTERIES) and (len(self._smartShunt_list) >= NR_OF_SMARTSHUNTS):
@@ -779,9 +838,29 @@ class DbusAggBatService(object):
                 # DC
                 # to detect error
                 step = "Read V, I, P"
-                Voltage += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
-                Current += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
-                Power += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
+
+                # If this battery has a paired SmartShunt, use the shunt's more
+                # precise V/I readings.  Fall back to BMS if shunt returns None.
+                shunt_svc = self._shunt_pair_map.get(i)
+                if shunt_svc is not None:
+                    shunt_v = self._dbusMon.dbusmon.get_value(shunt_svc, "/Dc/0/Voltage")
+                    shunt_i = self._dbusMon.dbusmon.get_value(shunt_svc, "/Dc/0/Current")
+                    if shunt_v is not None and shunt_i is not None:
+                        Voltage += shunt_v
+                        Current += shunt_i
+                        Power += shunt_v * shunt_i
+                    else:
+                        # SmartShunt returned None -- fall back to BMS
+                        logging.debug(
+                            "Shunt fallback for battery '%s': V=%s I=%s", i, shunt_v, shunt_i
+                        )
+                        Voltage += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
+                        Current += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
+                        Power += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
+                else:
+                    Voltage += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
+                    Current += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
+                    Power += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
 
                 # Capacity
                 step = "Read and calculate capacity, SoC, Time to go"
