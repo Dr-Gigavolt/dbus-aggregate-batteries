@@ -12,7 +12,7 @@ import configparser
 import sys
 import os
 import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 # ---------------------------------------------------------------------------
 # 1. Tests for get_pairs_from_config()
@@ -156,7 +156,6 @@ class TestGetPairsFromConfigReal(unittest.TestCase):
         # files and validate them at import time. Instead, read the function
         # source and compile it in isolation.
         import ast
-        import textwrap
 
         settings_path = os.path.join(project_root, "settings.py")
         with open(settings_path) as f:
