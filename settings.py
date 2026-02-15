@@ -7,7 +7,6 @@ from pathlib import Path
 from time import sleep
 from typing import Dict, List, Any, Callable
 
-
 PATH_CONFIG_DEFAULT: str = "config.default.ini"
 PATH_CONFIG_USER: str = "config.ini"
 
@@ -181,10 +180,7 @@ def get_pairs_from_config(group: str, option: str) -> Dict[int, str]:
         if not item:
             continue
         if ":" not in item:
-            errors_in_config.append(
-                f"Invalid pair '{item}' for option '{option}' in group '{group}'. "
-                f"Expected format: VRM_INSTANCE:BATTERY_NAME"
-            )
+            errors_in_config.append(f"Invalid pair '{item}' for option '{option}' in group '{group}'. " f"Expected format: VRM_INSTANCE:BATTERY_NAME")
             continue
         key_str, value = item.split(":", 1)
         key_str = key_str.strip()
@@ -192,15 +188,10 @@ def get_pairs_from_config(group: str, option: str) -> Dict[int, str]:
         try:
             key = int(key_str)
         except ValueError:
-            errors_in_config.append(
-                f"Invalid VRM instance '{key_str}' in pair '{item}' for option '{option}'. "
-                f"Must be an integer."
-            )
+            errors_in_config.append(f"Invalid VRM instance '{key_str}' in pair '{item}' for option '{option}'. " f"Must be an integer.")
             continue
         if not value:
-            errors_in_config.append(
-                f"Empty battery name in pair '{item}' for option '{option}'."
-            )
+            errors_in_config.append(f"Empty battery name in pair '{item}' for option '{option}'.")
             continue
         result[key] = value
     return result

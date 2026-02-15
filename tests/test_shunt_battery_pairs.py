@@ -32,9 +32,7 @@ class TestGetPairsFromConfig(unittest.TestCase):
         # We need to patch the module-level 'config' and 'errors_in_config'
         # before calling the function. Import settings fresh each time to
         # avoid cross-test contamination.
-        settings_path = os.path.join(
-            os.path.dirname(__file__), os.pardir, "settings.py"
-        )
+        settings_path = os.path.join(os.path.dirname(__file__), os.pardir, "settings.py")
         spec = importlib.util.spec_from_file_location("settings_test", settings_path)
         mod = importlib.util.module_from_spec(spec)
 
@@ -295,16 +293,10 @@ class TestShuntBatteryPairing(unittest.TestCase):
 
         shunt_vrm_to_service = {}
         try:
-            for service in sorted(
-                str(name)
-                for name in obj._dbusConn.list_names()
-                if "com.victronenergy" in str(name)
-            ):
+            for service in sorted(str(name) for name in obj._dbusConn.list_names() if "com.victronenergy" in str(name)):
                 if mock_settings.BATTERY_SERVICE_NAME not in service:
                     continue
-                pn = obj._dbusMon.dbusmon.get_value(
-                    service, mock_settings.BATTERY_PRODUCT_NAME_PATH
-                )
+                pn = obj._dbusMon.dbusmon.get_value(service, mock_settings.BATTERY_PRODUCT_NAME_PATH)
                 if pn is not None and mock_settings.SMARTSHUNT_NAME_KEYWORD in pn:
                     vrm_id = obj._dbusMon.dbusmon.get_value(service, "/DeviceInstance")
                     if vrm_id is not None:

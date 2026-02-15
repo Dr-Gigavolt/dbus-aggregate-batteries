@@ -851,9 +851,7 @@ class DbusAggBatService(object):
                         Power += shunt_v * shunt_i
                     else:
                         # SmartShunt returned None -- fall back to BMS
-                        logging.debug(
-                            "Shunt fallback for battery '%s': V=%s I=%s", i, shunt_v, shunt_i
-                        )
+                        logging.debug("Shunt fallback for battery '%s': V=%s I=%s", i, shunt_v, shunt_i)
                         Voltage += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
                         Current += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
                         Power += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
