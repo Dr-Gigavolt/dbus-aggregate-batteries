@@ -38,9 +38,9 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 # optionally from victron
 # sys.path.insert(1, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 
-from vedbus import VeDbusService  # noqa: E402
+from vedbus import VeDbusService, VeDbusItemImport  # noqa: E402
 
-VERSION = "4.0.20260210-beta"
+VERSION = "4.0.20260217-beta"
 
 
 class SystemBus(dbus.bus.BusConnection):
@@ -111,6 +111,9 @@ class DbusAggBatService(object):
         # last timestamp then the log was printed
         self._logLastPrintTimeStamp = 0
 
+        self.SETTINGS_PATH_SHORT = "Devices/aggregatebatteries/CustomName"  # without /Settings/ prefix for AddSetting
+        self.SETTINGS_PATH = "/Settings/" + self.SETTINGS_PATH_SHORT  # with /Settings/ prefix for VeDbusItemImport
+
         # read initial charge from text file
         try:
             self._charge_file = open("/data/apps/dbus-aggregate-batteries/storedvalue_charge", "r")  # read
@@ -154,6 +157,7 @@ class DbusAggBatService(object):
         # this product ID was randomly selected - please exchange, if interference with another component
         self._dbusservice.add_path("/ProductId", 0xBA44)
         self._dbusservice.add_path("/ProductName", "AggregateBatteries")
+        self._dbusservice.add_path("/CustomName", "AggregateBatteries", writeable=True, onchangecallback=self._callback_changed_custom_name)
         self._dbusservice.add_path("/FirmwareVersion", VERSION)
         self._dbusservice.add_path("/HardwareVersion", VERSION)
         self._dbusservice.add_path("/Connected", 1)
@@ -278,12 +282,12 @@ class DbusAggBatService(object):
         while self._dbusMon is None:
             tt.sleep(1)
 
-        # register VeDbusService after all paths where added
-        logging.info("Registering VeDbusService...")
-        self._dbusservice.register()
-
         # search com.victronenergy.settings
         GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_settings)
+
+        # register VeDbusService after all paths where added and all data is available
+        logging.info("Registering VeDbusService...")
+        self._dbusservice.register()
 
     # #############################################################################################################
     # #############################################################################################################
@@ -303,7 +307,7 @@ class DbusAggBatService(object):
     # ####################################################################
     # ####################################################################
 
-    def _find_settings(self):
+    def _find_settings(self) -> bool:
         logging.info("Searching Settings: Trial Nr. %d" % self._searchTrials)
         try:
             for service in self._dbusConn.list_names():
@@ -324,6 +328,25 @@ class DbusAggBatService(object):
 
         if self._settings is not None:
             self._searchTrials = 1
+
+            # try to read saved CustomName from settings and apply it if exists
+            try:
+                setting_item = VeDbusItemImport(self._dbusConn, self._settings, self.SETTINGS_PATH, createsignal=False)
+                if setting_item.exists:
+                    custom_name = setting_item.get_value()
+                    if custom_name is not None and custom_name != "AggregateBatteries":
+                        self._dbusservice["/CustomName"] = custom_name
+                        logging.info(f'   |- Custom name restored from settings: "{custom_name}"')
+            except Exception:
+                (
+                    exception_type,
+                    exception_object,
+                    exception_traceback,
+                ) = sys.exc_info()
+                file = exception_traceback.tb_frame.f_code.co_filename
+                line = exception_traceback.tb_lineno
+                logging.debug(f"Could not read CustomName from settings: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+
             # search batteries on DBus if present
             GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_FIND_DEVICES, self._find_batteries)
             # all OK, stop calling this function
@@ -343,7 +366,7 @@ class DbusAggBatService(object):
     # #####################################################################
     # #####################################################################
 
-    def _find_batteries(self):
+    def _find_batteries(self) -> bool:
         self._batteries_dict = {}
 
         # SmartShunt list - will be populated so battery category SmartShunts are at the beginning of the list
@@ -693,6 +716,61 @@ class DbusAggBatService(object):
             logging.error("Required number of MPPTs not found. Exiting...")
             tt.sleep(settings.TIME_BEFORE_RESTART)
             sys.exit(1)
+
+    def _callback_changed_custom_name(self, path, value):
+        """
+        Save the custom name to the dbus service com.victronenergy.settings/Settings/Devices/aggregatebatteries/CustomName
+
+        :param path: The dbus path being changed
+        :param value: The new custom name value
+        :return: The value if successful, None if failed
+        """
+
+        try:
+            # First check if the setting path exists in the settings service
+            setting_exists = False
+            try:
+                # Try to get the value to check if it exists
+                test_item = VeDbusItemImport(self._dbusConn, self._settings, self.SETTINGS_PATH, createsignal=False)
+                setting_exists = test_item.exists
+            except Exception:
+                setting_exists = False
+
+            # If setting doesn't exist, create it using AddSetting D-Bus method
+            if not setting_exists:
+                logging.info(f"Setting {self.SETTINGS_PATH} doesn't exist, creating it...")
+                try:
+                    settings_obj = self._dbusConn.get_object(self._settings, "/Settings")
+                    settings_iface = dbus.Interface(settings_obj, "com.victronenergy.Settings")
+                    # AddSetting(group, name, default_value, type, min, max)
+                    # type 's' = string, empty string for group means root /Settings/
+                    settings_iface.AddSetting("", self.SETTINGS_PATH_SHORT, value, "s", "", "")
+                    logging.info(f"Successfully created setting {self.SETTINGS_PATH}")
+                except dbus.exceptions.DBusException as e:
+                    logging.warning(f"Failed to create setting via AddSetting: {e}")
+                    # Setting might already exist, continue to try setting it
+
+            # Now set the value using VeDbusItemImport directly (bypasses dbusmonitor)
+            setting_item = VeDbusItemImport(self._dbusConn, self._settings, self.SETTINGS_PATH, createsignal=False)
+            result = setting_item.set_value(value)
+
+            if result == 0:
+                logging.info(f'CustomName successfully changed to "{value}"')
+                return value
+            else:
+                logging.warning(f'CustomName change to "{value}" failed with result: {result}')
+                return False
+
+        except Exception:
+            (
+                exception_type,
+                exception_object,
+                exception_traceback,
+            ) = sys.exc_info()
+            file = exception_traceback.tb_frame.f_code.co_filename
+            line = exception_traceback.tb_lineno
+            logging.warning(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            return False
 
     # #################################################################################
     # #################################################################################

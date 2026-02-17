@@ -130,7 +130,9 @@ class DbusMon:
                 "/Dc/0/Current": dummy,
                 "/ProductName": dummy,
             },
-            "com.victronenergy.settings": {"/Settings/CGwacs/OvervoltageFeedIn": dummy},
+            "com.victronenergy.settings": {
+                "/Settings/CGwacs/OvervoltageFeedIn": dummy,
+            },
             "com.victronenergy.system": {
                 "/SystemState/LowSoc": dummy,
                 "/SystemState/BatteryLife": dummy,
