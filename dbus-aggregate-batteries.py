@@ -43,18 +43,9 @@ from vedbus import VeDbusService  # noqa: E402
 VERSION = "4.0.20260210-beta"
 
 
-class SystemBus(dbus.bus.BusConnection):
-    def __new__(cls):
-        return dbus.bus.BusConnection.__new__(cls, dbus.bus.BusConnection.TYPE_SYSTEM)
-
-
-class SessionBus(dbus.bus.BusConnection):
-    def __new__(cls):
-        return dbus.bus.BusConnection.__new__(cls, dbus.bus.BusConnection.TYPE_SESSION)
-
-
-def get_bus() -> dbus.bus.BusConnection:
-    return SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else SystemBus()
+def get_bus():
+    """Return the shared system bus connection (singleton provided by dbus-python)."""
+    return dbus.SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else dbus.SystemBus()
 
 
 class DbusAggBatService(object):
