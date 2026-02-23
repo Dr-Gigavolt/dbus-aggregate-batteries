@@ -190,7 +190,9 @@ class DbusAggBatService(object):
 
         # Create temperature paths
         self._dbusservice.add_path("/Dc/0/Temperature", None, writeable=True)
+        self._dbusservice.add_path("/System/MinTemperatureCellId", None, writeable=True)
         self._dbusservice.add_path("/System/MinCellTemperature", None, writeable=True)
+        self._dbusservice.add_path("/System/MaxTemperatureCellId", None, writeable=True)
         self._dbusservice.add_path("/System/MaxCellTemperature", None, writeable=True)
 
         # Create extras paths
@@ -785,10 +787,10 @@ class DbusAggBatService(object):
 
         # Temperature
         Temperature = 0
-        # list, maxima of all physical batteries
-        MaxCellTemp_list = []
-        # list, minima of all physical batteries
-        MinCellTemp_list = []
+        # dictionary {'ID' : MaxCellTemperature, ... } for all physical batteries
+        MaxCellTemp_dict = {}
+        # dictionary {'ID' : MinCellTemperature, ... } for all physical batteries
+        MinCellTemp_dict = {}
 
         # Extras
         cellVoltages_dict = {}
@@ -871,8 +873,20 @@ class DbusAggBatService(object):
                 # Temperature
                 step = "Read temperatures"
                 Temperature += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Temperature")
-                MaxCellTemp_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxCellTemperature"))
-                MinCellTemp_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinCellTemperature"))
+                MaxCellTemp_dict[
+                    "%s: %s"
+                    % (
+                        self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/CustomName"),
+                        self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxTemperatureCellId"),
+                    )
+                ] = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxCellTemperature")
+                MinCellTemp_dict[
+                    "%s: %s"
+                    % (
+                        self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/CustomName"),
+                        self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinTemperatureCellId"),
+                    )
+                ] = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinCellTemperature")
 
                 # Cell voltages
                 # cell ID : its voltage
@@ -961,6 +975,14 @@ class DbusAggBatService(object):
                 # list of AllowToBalance to find minimum
                 AllowToBalance_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Io/AllowToBalance"))
 
+            step = "Find max. and min. cell temperature of all batteries"
+            # placed in try-except structure for the case if some values are of None.
+            # The _max() and _min() don't work with dictionaries
+            MaxTempCellId = max(MaxCellTemp_dict, key=MaxCellTemp_dict.get)
+            MaxCellTemp = MaxCellTemp_dict[MaxTempCellId]
+            MinTempCellId = min(MinCellTemp_dict, key=MinCellTemp_dict.get)
+            MinCellTemp = MinCellTemp_dict[MinTempCellId]
+
             step = "Find max. and min. cell voltage of all batteries"
             # placed in try-except structure for the case if some values are of None.
             # The _max() and _min() don't work with dictionaries
@@ -999,10 +1021,6 @@ class DbusAggBatService(object):
         Voltage = Voltage / settings.NR_OF_BATTERIES
         Temperature = Temperature / settings.NR_OF_BATTERIES
         VoltagesSum = sum(VoltagesSum_dict.values()) / settings.NR_OF_BATTERIES
-
-        # find max and min cell temperature (have no ID)
-        MaxCellTemp = self._fn._max(MaxCellTemp_list)
-        MinCellTemp = self._fn._min(MinCellTemp_list)
 
         # find max in alarms
         LowVoltage_alarm = self._fn._max(LowVoltage_alarm_list)
@@ -1349,7 +1367,9 @@ class DbusAggBatService(object):
             # send temperature
             bus["/Dc/0/Temperature"] = Temperature
             bus["/System/MaxCellTemperature"] = MaxCellTemp
+            bus["/System/MaxTemperatureCellId"] = MaxTempCellId
             bus["/System/MinCellTemperature"] = MinCellTemp
+            bus["/System/MinTemperatureCellId"] = MinTempCellId
 
             # send cell voltages
             bus["/System/MaxCellVoltage"] = MaxCellVoltage
