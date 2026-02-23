@@ -878,16 +878,16 @@ class DbusAggBatService(object):
                 # cell ID : its voltage
                 step = "Read max. and min cell voltages and voltage sum"
                 MaxCellVoltage_dict[
-                    "%s_%s"
+                    "%s: %s"
                     % (
-                        i,
+                        self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/CustomName"),
                         self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxVoltageCellId"),
                     )
                 ] = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxCellVoltage")
                 MinCellVoltage_dict[
-                    "%s_%s"
+                    "%s: %s"
                     % (
-                        i,
+                        self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/CustomName"),
                         self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinVoltageCellId"),
                     )
                 ] = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinCellVoltage")
