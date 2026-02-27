@@ -22,6 +22,7 @@ import platform
 import dbus
 import re
 import settings
+from enum import Enum
 from functions import Functions
 
 # for UTC time stamps for logging
@@ -41,6 +42,12 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 from vedbus import VeDbusService, VeDbusItemImport  # noqa: E402
 
 VERSION = "4.1.20260227-beta"
+
+
+class AggregatedChargeMode(Enum):
+    BULK_OR_ABSORPTION = 1
+    FLOAT_TRANSITION = 2
+    FLOAT = 3
 
 
 def get_bus():
@@ -101,6 +108,7 @@ class DbusAggBatService(object):
         self._dynamicCVL = False
         # last timestamp then the log was printed
         self._logLastPrintTimeStamp = 0
+        self._aggregated_charge_mode: AggregatedChargeMode = AggregatedChargeMode.FLOAT
 
         self.SETTINGS_PATH_SHORT = "Devices/aggregatebatteries/CustomName"  # without /Settings/ prefix for AddSetting
         self.SETTINGS_PATH = "/Settings/" + self.SETTINGS_PATH_SHORT  # with /Settings/ prefix for VeDbusItemImport
@@ -1040,7 +1048,11 @@ class DbusAggBatService(object):
 
         # find max. charge voltage (if needed)
         if not settings.OWN_CHARGE_PARAMETERS:
-            if settings.KEEP_MAX_CVL and any("Float" in item for item in ChargeMode_list):
+            if settings.AGGREGATE_CHARGE_MODE:
+                self._update_aggregated_charge_mode(ChargeMode_list)
+                MaxChargeVoltage = self._get_cvl_with_aggregated_charge_mode(MaxChargeVoltage_list, ChargeMode_list)
+
+            elif settings.KEEP_MAX_CVL and any("Float" in item for item in ChargeMode_list):
                 MaxChargeVoltage = self._fn._max(MaxChargeVoltage_list)
 
             else:
@@ -1451,6 +1463,48 @@ class DbusAggBatService(object):
             )
 
         return True
+
+    def _update_aggregated_charge_mode(self, ChargeMode_list: list):
+        if not any("Float" in mode for mode in ChargeMode_list):
+            # All batteries are in Bulk or Absorbtion mode.
+            self._set_aggregated_charge_mode(AggregatedChargeMode.BULK_OR_ABSORPTION)
+        elif any("Float Transition" in mode for mode in ChargeMode_list) and all("Float" in mode for mode in ChargeMode_list):
+            # The last battery went to Float Transition mode and all other batteries are in Float mode.
+            self._set_aggregated_charge_mode(AggregatedChargeMode.FLOAT_TRANSITION)
+        elif all("Float" in mode for mode in ChargeMode_list):
+            # All batteries are in Float mode and there's no batteries in Float Transition mode.
+            self._set_aggregated_charge_mode(AggregatedChargeMode.FLOAT)
+        else:
+            # Any other case leaves the mode unchanged.
+            pass
+
+    def _set_aggregated_charge_mode(self, mode: AggregatedChargeMode):
+        if self._aggregated_charge_mode != mode:
+            self._aggregated_charge_mode = mode
+            logging.info(f"Switching the aggregated charge mode to {mode.name}")
+
+    def _get_cvl_with_aggregated_charge_mode(self, MaxChargeVoltage_list: list, ChargeMode_list: list):
+        BulkOrAbsorptionCVLs = []
+        FloatTransitionCVLs = []
+        FloatCVLs = []
+        for voltage, mode in zip(MaxChargeVoltage_list, ChargeMode_list):
+            if mode.startswith("Float Transition"):
+                FloatTransitionCVLs.append(voltage)
+            elif mode.startswith("Float"):
+                FloatCVLs.append(voltage)
+            else:
+                BulkOrAbsorptionCVLs.append(voltage)
+
+        match self._aggregated_charge_mode:
+            case AggregatedChargeMode.BULK_OR_ABSORPTION:
+                # Ignore float voltages to ensure all batteries in Bulk or Absorption modes can finish charging.
+                return self._fn._min(BulkOrAbsorptionCVLs)
+            case AggregatedChargeMode.FLOAT_TRANSITION:
+                # Use max CVL among all batteries in Float Transition modes, limited for safety by min CVL among all batteries in Bulk or Absorption modes.
+                cap = self._fn._min(BulkOrAbsorptionCVLs) if BulkOrAbsorptionCVLs else float("inf")
+                return self._fn._min([self._fn._max(FloatTransitionCVLs), cap])
+            case AggregatedChargeMode.FLOAT:
+                return self._fn._min(MaxChargeVoltage_list)
 
 
 # ################

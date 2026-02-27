@@ -265,6 +265,7 @@ if not CELL_DISCHARGE_LIMITED_CURRENT or len(CELL_DISCHARGE_LIMITED_CURRENT) < 2
 
 # --------- if OWN_CHARGE_PARAMETERS = False ---------
 KEEP_MAX_CVL: bool = get_bool_from_config("DEFAULT", "KEEP_MAX_CVL")
+AGGREGATE_CHARGE_MODE: bool = get_bool_from_config("DEFAULT", "AGGREGATE_CHARGE_MODE")
 SEND_CELL_VOLTAGES: int = get_int_from_config("DEFAULT", "SEND_CELL_VOLTAGES")
 LOG_PERIOD: int = get_int_from_config("DEFAULT", "LOG_PERIOD")
 
