@@ -1,6 +1,18 @@
-## Version 4.0.20251009
+## Version 4.1.20260227
 
-Many thanks to all contibutors for their help. The newest and most substantial contributions are from:
+Mr-Manuel:
+- Improved logging
+- Added High Cell Voltage alarm
+- Custom name path added, this allows the user to set a custom name for this driver. The name is stored in com.victronenergy.settings/Settings/Devices/aggregatebatteries/CustomName
+- Battery custom name and cell name of min/max temperature (Mr-Manuel)
+
+Clinton Goudie-Nice, cursoragent:
+- fix: use dbus.SystemBus() singleton to prevent D-Bus connection leaks. The custom SystemBus and SessionBus classes inherit from dbus.bus.BusConnection, which creates a new connection to the D-Bus daemon on every instantiation. When the GLib main loop is set as the default (via DBusGMainLoop), these connections are pinned in memory by C-level GLib watch/timeout references that Python's GC cannot reach. Over time this exhausts the per-UID connection limit (org.freedesktop.DBus.Error.LimitsExceeded).
+
+Replace with dbus.SystemBus() / dbus.SessionBus() which return an
+internally-cached singleton, ensuring only one connection per process.
+
+## Version 4.0.20251009
 
 Mr-Manuel:
 - cleaning up the code
@@ -11,19 +23,8 @@ Mr-Manuel:
 atillac:
 - many options with Smart Shunts
 
-We very appreciate your testing and reporting before we file a new release.
+Many thanks to all contibutors.We very appreciate your testing and bug reporting.
 
------------------------------------------------------------------------------------------------------------------------------------------------------
-### Troubles with previous version with new Venus OS
-
-I deleted releases after July 7-th 2025 because there were issues with new installation stcripts. If you need to make make the release 3.5.20250707 running after upgrade of the Venus OS, please proceed as follows:
-
-- copy the dbus-aggregate-batteries directory into /data/app manually
-- in dbus-aggregate-batteries/aggregatebatteries.py change all absolute paths /data to /data/apps
-- in dbus-aggregate-batteries/service/run change path /data to /data/apps
-- remove the old symbolic link /service/dbus-aggregate-batteries
-- create new symbolic link: ln -s /data/apps/dbus-aggregate-batteries/service /service/dbus-aggregate-batteries
-- if you need shell scripts, change paths there to /data/apps as well. In this case correct the path to reinstall-local.sh in /data/rc.local. If you don't need them, you can delete them as well as the entry in rc.local. I recommend to keep and correct at least restart.sh and restart_dbus-serial-battery.sh, they are useful for debugging.
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
 ## History
