@@ -9,9 +9,6 @@ Mr-Manuel:
 Clinton Goudie-Nice, cursoragent:
 - fix: use dbus.SystemBus() singleton to prevent D-Bus connection leaks. The custom SystemBus and SessionBus classes inherit from dbus.bus.BusConnection, which creates a new connection to the D-Bus daemon on every instantiation. When the GLib main loop is set as the default (via DBusGMainLoop), these connections are pinned in memory by C-level GLib watch/timeout references that Python's GC cannot reach. Over time this exhausts the per-UID connection limit (org.freedesktop.DBus.Error.LimitsExceeded).
 
-Replace with dbus.SystemBus() / dbus.SessionBus() which return an
-internally-cached singleton, ensuring only one connection per process.
-
 ## Version 4.0.20251009
 
 Mr-Manuel:
