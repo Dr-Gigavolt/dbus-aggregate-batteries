@@ -18,6 +18,7 @@ from gi.repository import GLib
 import logging
 import sys
 import os
+import tempfile
 import platform
 import dbus
 import re
@@ -41,6 +42,19 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 from vedbus import VeDbusService, VeDbusItemImport  # noqa: E402
 
 VERSION = "4.1.20260227-beta"
+
+_STATE_FILE_CHARGE = "/data/apps/dbus-aggregate-batteries/storedvalue_charge"
+_STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
+
+
+def _write_atomic(path: str, content: str) -> None:
+    """Write content atomically to path via a temporary file and os.replace."""
+    dir_ = os.path.dirname(path)
+    with tempfile.NamedTemporaryFile(mode="w", dir=dir_, delete=False, suffix=".tmp") as tmp:
+        tmp.write(content)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+    os.replace(tmp.name, path)
 
 
 def get_bus():
@@ -107,11 +121,20 @@ class DbusAggBatService(object):
 
         # read initial charge from text file
         try:
-            self._charge_file = open("/data/apps/dbus-aggregate-batteries/storedvalue_charge", "r")  # read
-            self._ownCharge = float(self._charge_file.readline().strip())
-            self._charge_file.close()
+            with open(_STATE_FILE_CHARGE, "r") as f:
+                self._ownCharge = float(f.readline().strip())
             self._ownCharge_old = self._ownCharge
             logging.info("Initial Ah read from file: %.0fAh" % (self._ownCharge))
+        except FileNotFoundError:
+            logging.warning("Charge file not found. Starting with 0 Ah.")
+            self._ownCharge = 0.0
+            self._ownCharge_old = self._ownCharge
+            _write_atomic(_STATE_FILE_CHARGE, "%.3f" % self._ownCharge)
+        except ValueError:
+            logging.warning("Charge file corrupt. Starting with 0 Ah.")
+            self._ownCharge = 0.0
+            self._ownCharge_old = self._ownCharge
+            _write_atomic(_STATE_FILE_CHARGE, "%.3f" % self._ownCharge)
         except Exception:
             logging.error("Charge file read error. Exiting...")
             tt.sleep(settings.TIME_BEFORE_RESTART)
@@ -120,12 +143,8 @@ class DbusAggBatService(object):
         # read the day of the last balancing from text file
         if settings.OWN_CHARGE_PARAMETERS:
             try:
-                self._lastBalancing_file = open(
-                    "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
-                    "r",
-                )
-                self._lastBalancing = int(self._lastBalancing_file.readline().strip())
-                self._lastBalancing_file.close()
+                with open(_STATE_FILE_BALANCING, "r") as f:
+                    self._lastBalancing = int(f.readline().strip())
                 # in days
                 time_unbalanced = int((dt.now()).strftime("%j")) - self._lastBalancing
                 if time_unbalanced < 0:
@@ -133,6 +152,12 @@ class DbusAggBatService(object):
                     time_unbalanced += 365
                 logging.info("Last balancing done at the %d. day of the year" % (self._lastBalancing))
                 logging.info("Batteries balanced %d days ago." % time_unbalanced)
+            except FileNotFoundError:
+                logging.warning("Last balancing file not found. Treating as never balanced.")
+                self._lastBalancing = 0
+            except ValueError:
+                logging.warning("Last balancing file corrupt. Treating as never balanced.")
+                self._lastBalancing = 0
             except Exception:
                 logging.error("Last balancing file read error. Exiting...")
                 tt.sleep(settings.TIME_BEFORE_RESTART)
@@ -1188,12 +1213,7 @@ class DbusAggBatService(object):
                     if Voltage <= CVL_NORMAL:
                         self._balancing = 0
                         self._lastBalancing = int((dt.now()).strftime("%j"))
-                        self._lastBalancing_file = open(
-                            "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
-                            "w",
-                        )
-                        self._lastBalancing_file.write("%s" % self._lastBalancing)
-                        self._lastBalancing_file.close()
+                        _write_atomic(_STATE_FILE_BALANCING, "%s" % self._lastBalancing)
                         logging.info("CVL increase for balancing de-activated")
 
                 if self._balancing == 0:
@@ -1203,12 +1223,7 @@ class DbusAggBatService(object):
             elif (time_unbalanced > 0) and (Voltage >= CVL_BALANCING) and ((MaxCellVoltage - MinCellVoltage) < settings.CELL_DIFF_MAX):
                 logging.info("Balancing goal reached with full charging set as normal. Updating storedvalue_last_balancing file")
                 self._lastBalancing = int((dt.now()).strftime("%j"))
-                self._lastBalancing_file = open(
-                    "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing",
-                    "w",
-                )
-                self._lastBalancing_file.write("%s" % self._lastBalancing)
-                self._lastBalancing_file.close()
+                _write_atomic(_STATE_FILE_BALANCING, "%s" % self._lastBalancing)
 
             if Voltage >= CVL_BALANCING:
                 # reset Coulumb counter to 100%
@@ -1322,9 +1337,7 @@ class DbusAggBatService(object):
 
         # store the charge into text file if changed significantly (avoid frequent file access)
         if abs(self._ownCharge - self._ownCharge_old) >= (settings.CHARGE_SAVE_PRECISION * InstalledCapacity):
-            self._charge_file = open("/data/apps/dbus-aggregate-batteries/storedvalue_charge", "w")
-            self._charge_file.write("%.3f" % self._ownCharge)
-            self._charge_file.close()
+            _write_atomic(_STATE_FILE_CHARGE, "%.3f" % self._ownCharge)
             self._ownCharge_old = self._ownCharge
 
         # overwrite BMS charge values
