@@ -210,6 +210,8 @@ OWN_SOC: bool = get_bool_from_config("DEFAULT", "OWN_SOC")
 ZERO_SOC: bool = get_bool_from_config("DEFAULT", "ZERO_SOC")
 MAX_CELL_VOLTAGE_SOC_FULL: float = get_float_from_config("DEFAULT", "MAX_CELL_VOLTAGE_SOC_FULL")
 MIN_CELL_VOLTAGE_SOC_EMPTY: float = get_float_from_config("DEFAULT", "MIN_CELL_VOLTAGE_SOC_EMPTY")
+OWN_SOC_FULL_VOLTAGE: float = get_float_from_config("DEFAULT", "OWN_SOC_FULL_VOLTAGE")
+OWN_SOC_FULL_CELL_MEDIAN_VOLTAGE: float = get_float_from_config("DEFAULT", "OWN_SOC_FULL_CELL_MEDIAN_VOLTAGE")
 CHARGE_SAVE_PRECISION: float = get_float_from_config("DEFAULT", "CHARGE_SAVE_PRECISION")
 
 
