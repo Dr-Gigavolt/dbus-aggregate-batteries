@@ -1375,7 +1375,7 @@ class DbusAggBatService(object):
             bus["/TimeToGo"] = TimeToGo
             bus["/Capacity"] = Capacity
             bus["/InstalledCapacity"] = InstalledCapacity
-            bus["/ConsumedAmphours"] = ConsumedAmphours
+            bus["/ConsumedAmphours"] = - ConsumedAmphours
 
             # send temperature
             bus["/Dc/0/Temperature"] = Temperature
