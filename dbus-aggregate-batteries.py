@@ -1344,7 +1344,7 @@ class DbusAggBatService(object):
         if settings.OWN_SOC:
             Capacity = self._ownCharge
             Soc = 100 * self._ownCharge / InstalledCapacity
-            ConsumedAmphours = InstalledCapacity - self._ownCharge
+            ConsumedAmphours = - InstalledCapacity + self._ownCharge   # zero if fully charged, otherwise negative
             if (self._dbusMon.dbusmon.get_value("com.victronenergy.system", "/SystemState/LowSoc") == 0) and (Current < 0):
                 TimeToGo = -3600 * self._ownCharge / Current
             else:
@@ -1375,7 +1375,7 @@ class DbusAggBatService(object):
             bus["/TimeToGo"] = TimeToGo
             bus["/Capacity"] = Capacity
             bus["/InstalledCapacity"] = InstalledCapacity
-            bus["/ConsumedAmphours"] = - ConsumedAmphours
+            bus["/ConsumedAmphours"] = ConsumedAmphours
 
             # send temperature
             bus["/Dc/0/Temperature"] = Temperature
