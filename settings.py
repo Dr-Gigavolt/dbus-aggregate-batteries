@@ -92,6 +92,64 @@ def get_bool_from_config(group: str, option: str) -> bool:
     return config[group].get(option, "False").lower() == "true"
 
 
+def get_smartshunts_from_config(group: str, option: str):
+    """
+    Get a SmartShunt selector from the config file.
+
+    The driver's USE_SMARTSHUNTS handling (see dbus-aggregate-batteries.py)
+    accepts either a bool ("True"/"False" — use all or none of the available
+    SmartShunts) or a list of VRM instance ids and/or shunt CustomNames
+    (e.g. ``[277]``, ``[279, 280]``, ``["MyShunt", 279]``). The list form is
+    documented in config.default.ini but won't reach the driver if parsed as
+    a plain bool, so this helper handles both cases.
+
+    Uses ``json.loads`` for list parsing (no code execution).
+
+    :param group: Group in the config file
+    :param option: Option in the config file
+    :return: bool or list
+    """
+    import json
+
+    raw = config[group].get(option, "False").strip()
+    if not raw:
+        return False
+    # Bool forms first
+    low = raw.lower()
+    if low in ("true", "yes", "1"):
+        return True
+    if low in ("false", "no", "0"):
+        return False
+    # List form: accept Python single-quoted strings by normalising to JSON
+    if raw.startswith("[") and raw.endswith("]"):
+        candidate = raw.replace("'", '"')
+        try:
+            val = json.loads(candidate)
+        except (ValueError, TypeError):
+            val = None
+        if isinstance(val, list):
+            # Each element must be int (VRM instance) or str (custom name).
+            # The driver match loop only handles those two types; bool/float/None
+            # would crash it with a confusing error later, so reject up front.
+            # bool is a subclass of int in Python — exclude it explicitly.
+            bad = [
+                (idx, item)
+                for idx, item in enumerate(val)
+                if isinstance(item, bool) or not isinstance(item, (int, str))
+            ]
+            if bad:
+                errors_in_config.append(
+                    f"Invalid {option} list elements: {bad!r}. "
+                    "Each entry must be an int (VRM instance) or str (custom name)."
+                )
+                return False
+            return val
+    errors_in_config.append(
+        f"Invalid {option} value: {raw!r}. Expected True/False or list like [277]."
+    )
+    return False
+
+
 def get_float_from_config(group: str, option: str, default_value: float = 0) -> float:
     """
     Get a float value from the config file.
@@ -203,7 +261,7 @@ TIME_BEFORE_RESTART: int = get_int_from_config("DEFAULT", "TIME_BEFORE_RESTART")
 
 # ----- Options -----
 CURRENT_FROM_VICTRON: bool = get_bool_from_config("DEFAULT", "CURRENT_FROM_VICTRON")
-USE_SMARTSHUNTS: bool = get_bool_from_config("DEFAULT", "USE_SMARTSHUNTS")
+USE_SMARTSHUNTS = get_smartshunts_from_config("DEFAULT", "USE_SMARTSHUNTS")
 INVERT_SMARTSHUNTS: bool = get_bool_from_config("DEFAULT", "INVERT_SMARTSHUNTS")
 IGNORE_SMARTSHUNT_ABSENCE: bool = get_bool_from_config("DEFAULT", "IGNORE_SMARTSHUNT_ABSENCE")
 OWN_SOC: bool = get_bool_from_config("DEFAULT", "OWN_SOC")
