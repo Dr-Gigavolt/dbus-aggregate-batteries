@@ -76,13 +76,27 @@ https://github.com/Dr-Gigavolt/dbus-aggregate-batteries/issues/24
 ## Function
 
 On start, the program searches for DBus services:
-- all Serial Batteries. Smart Shunts as battery current monitor are neither supported nor needed, you can activate precise current measurement by Victron devices if the precision of your BMS is not sufficient.
+- all Serial Batteries. By default Smart Shunts are not used as the battery current source — precise current measurement can be activated via `CURRENT_FROM_VICTRON = True`, which sums Multiplus/Quattro and solar charger DC currents. For systems with a current source the driver does not enumerate (Orion DC-DC, external DC chargers, anything registered outside `com.victronenergy.{vebus,solarcharger}`), enable `SMARTSHUNT_AS_BATTERY_CURRENT = True` together with `USE_SMARTSHUNTS = [<instance>]` to use a battery-mode SmartShunt as the authoritative bank current — see "Smart Shunts as battery current source" below.
 - one Smart Shunt for DC load (option)
 - Multiplus or Quattro (or cluster of them) for DC current measurement
 - all solar chargers (SmartSolar, BlueSolar, MPPT RS) for DC current measurement
 
 The data from DBus are collected, processed and the results are sent back to DBus once per second.
 Dbus monitor defined in dbusmon.py is used instead of VeDbusItemImport which was very resource hungry (since V2.0). I strongly recommend to everyone modifying the code to keep this technique.
+
+### Smart Shunts as battery current source
+
+By default the aggregate computes bank current as `Quattro/Multiplus + solar chargers + DC-load shunts`. This is correct for most setups, but it cannot see current sources the driver does not enumerate — most notably Orion DC-DC converters (registered as `com.victronenergy.dcdc`), which often carry alternator charge into the battery bank. In that case the driver under-reports charge current and the alternator contribution is invisible to ESS, DVCC and VRM.
+
+If a battery-mode SmartShunt is wired as the bank's master shunt, set in `config.ini`:
+
+- `USE_SMARTSHUNTS = [<instance>]` — battery-mode SmartShunt instance number(s). The shunt must see all current flowing into and out of the bank.
+- `SMARTSHUNT_AS_BATTERY_CURRENT = True`
+- `INVERT_SMARTSHUNTS = True` — only if your shunt is wired with reversed polarity.
+
+The aggregate then uses the SmartShunt reading directly as the bank current, instead of summing the Victron sources. This avoids both the invisibility problem above and double-counting (the master SmartShunt already includes Quattro and MPPT contributions).
+
+Leave `SMARTSHUNT_AS_BATTERY_CURRENT = False` (the default) if your SmartShunt only monitors a subset of the bank current — for example a load branch — and let the driver continue to sum Victron sources via `CURRENT_FROM_VICTRON`.
 
 If you wish to combine the charger control parameters (`CVL - Charge Voltage Limit`, `CCL - Charge Current Limit`, `DCL - Discharge Current Limit`) provided by all instances of dbus-serialbattery, please set `OWN_CHARGE_PARAMETERS = False`.
 
