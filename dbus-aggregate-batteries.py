@@ -1162,14 +1162,25 @@ class DbusAggBatService(object):
                         return True
 
             if success:
-                if settings.INVERT_SMARTSHUNTS:
-                    Current_VE -= Current_SHUNTS
+                # When a battery-mode SmartShunt is configured to be the
+                # authoritative bank-current source (`SMARTSHUNT_AS_BATTERY_CURRENT`
+                # = True), use Current_SHUNTS directly and ignore the Quattro+MPPT
+                # sum. This is the right choice for setups where the SmartShunt is
+                # wired in-line with the bank — its reading already includes the
+                # Multi/MPPT contributions, so adding them again would double-count.
+                # Falls through to the original additive behaviour when the flag
+                # is False (default) or no battery-mode shunt is in the list.
+                if settings.SMARTSHUNT_AS_BATTERY_CURRENT and self._num_battery_shunts > 0:
+                    Current = Current_SHUNTS
                 else:
-                    Current_VE += Current_SHUNTS
-                # BMS current overwritten only if no exception raised
-                Current = Current_VE
+                    if settings.INVERT_SMARTSHUNTS:
+                        Current_VE -= Current_SHUNTS
+                    else:
+                        Current_VE += Current_SHUNTS
+                    # BMS current overwritten only if no exception raised
+                    Current = Current_VE
                 # calculate own power (not read from BMS)
-                Power = Voltage * Current_VE
+                Power = Voltage * Current
             else:
                 # the BMS values are not overwritten
                 logging.error("Victron current reading error. Using BMS current and power instead")
