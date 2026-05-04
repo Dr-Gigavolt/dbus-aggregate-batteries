@@ -65,6 +65,38 @@ class Functions:
         with open("/sys/firmware/devicetree/base/model", "r") as f:
             return f.readline().strip()
 
+    def _median(self, values):
+        values = sorted(value for value in values if value is not None)
+        if not values:
+            return None
+
+        mid = len(values) // 2
+        if len(values) % 2:
+            return values[mid]
+
+        return (values[mid - 1] + values[mid]) / 2
+
+    def _full_charge_reached(
+        self,
+        pack_voltage,
+        balancing_voltage,
+        own_soc_full_voltage=None,
+        cell_voltages=None,
+        own_soc_full_cell_median_voltage=None,
+    ):
+        if pack_voltage >= balancing_voltage:
+            return True
+        if own_soc_full_voltage is not None and pack_voltage >= own_soc_full_voltage:
+            return True
+        if own_soc_full_cell_median_voltage is None or cell_voltages is None:
+            return False
+
+        median_cell_voltage = self._median(cell_voltages)
+        if median_cell_voltage is None:
+            return False
+
+        return median_cell_voltage >= own_soc_full_cell_median_voltage
+
 
 ################
 # test program #

@@ -1236,7 +1236,13 @@ class DbusAggBatService(object):
                 self._lastBalancing = int((dt.now()).strftime("%j"))
                 _write_atomic(_STATE_FILE_BALANCING, "%s" % self._lastBalancing)
 
-            if Voltage >= CVL_BALANCING:
+            if self._fn._full_charge_reached(
+                Voltage,
+                CVL_BALANCING,
+                settings.OWN_SOC_FULL_VOLTAGE or None,
+                cellVoltages_dict.values(),
+                settings.OWN_SOC_FULL_CELL_MEDIAN_VOLTAGE or None,
+            ):
                 # reset Coulumb counter to 100%
                 self._ownCharge = InstalledCapacity
 
