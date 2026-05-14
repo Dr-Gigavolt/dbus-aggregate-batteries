@@ -2,6 +2,7 @@
 
 baudje:
 - Smart Shunts as battery current source
+
 Dr.Gigavolt:
 - The sign of ConsumedAmphours changed to negative
 
