@@ -1,3 +1,10 @@
+## Version 4.2.20260514
+
+baudje:
+- Smart Shunts as battery current source
+Dr.Gigavolt:
+- The sign of ConsumedAmphours changed to negative
+
 ## Version 4.1.20260227
 
 Mr-Manuel:
