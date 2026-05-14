@@ -41,7 +41,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext"))
 
 from vedbus import VeDbusService, VeDbusItemImport  # noqa: E402
 
-VERSION = "4.1.20260227-beta"
+VERSION = "4.2.20260514-beta"
 
 _STATE_FILE_CHARGE = "/data/apps/dbus-aggregate-batteries/storedvalue_charge"
 _STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
