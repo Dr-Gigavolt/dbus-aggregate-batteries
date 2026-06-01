@@ -4,6 +4,8 @@
 Service to aggregate multiple serial batteries https://github.com/mr-manuel/venus-os_dbus-serialbattery
 to one virtual battery.
 
+modified by DJ0ABR to support Pylontech Batteries and mixed configurations made from Pylontech and DIY batteries
+
 Python location on Venus:
 /usr/bin/python3.8
 /usr/lib/python3.8/site-packages/
@@ -499,12 +501,12 @@ class DbusAggBatService(object):
                                 )
 
                         # Check if Nr. of cells is equal
-                        if self._dbusMon.dbusmon.get_value(service, "/System/NrOfCellsPerBattery") != settings.NR_OF_CELLS_PER_BATTERY:
+                        nr_of_cells = self._dbusMon.dbusmon.get_value(service, "/System/NrOfCellsPerBattery")
+
+                        if nr_of_cells is not None and nr_of_cells != settings.NR_OF_CELLS_PER_BATTERY:
                             logging.error("     |- Number of battery cells does not match config:")
-                            logging.error(
-                                "        |- Cells found in battery:         %d" % (self._dbusMon.dbusmon.get_value(service, "/System/NrOfCellsPerBattery"))
-                            )
-                            logging.error("        |- Cells specified in config file: %d" % (settings.NR_OF_CELLS_PER_BATTERY))
+                            logging.error("        |- Cells found in battery:         %d" % nr_of_cells)
+                            logging.error("        |- Cells specified in config file: %d" % settings.NR_OF_CELLS_PER_BATTERY)
                             logging.error("Exiting...")
                             tt.sleep(settings.TIME_BEFORE_RESTART)
                             sys.exit(1)
@@ -884,11 +886,21 @@ class DbusAggBatService(object):
                 InstalledCapacity += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
 
                 if not settings.OWN_SOC:
-                    ConsumedAmphours += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/ConsumedAmphours")
-                    Capacity += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Capacity")
+                    ConsumedAmphours += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/ConsumedAmphours") or 0
+                    #Capacity += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Capacity") or 0
+                    capacity_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Capacity")
+
+                    if capacity_get is not None:
+                        Capacity += capacity_get
+                    else:
+                        installed_capacity_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
+                        soc_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Soc")
+
+                        if installed_capacity_get is not None and soc_get is not None:
+                            Capacity += installed_capacity_get * soc_get / 100
                     Soc += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Soc") * self._dbusMon.dbusmon.get_value(
                         self._batteries_dict[i], "/InstalledCapacity"
-                    )
+                    ) or 0
                     ttg = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/TimeToGo")
                     if (ttg is not None) and (TimeToGo is not None):
                         TimeToGo += ttg * self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
@@ -933,13 +945,17 @@ class DbusAggBatService(object):
 
                 # here an exception is raised and new read trial initiated if None is on Dbus
                 volt_sum_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Sum")
+
                 if volt_sum_get is not None:
                     VoltagesSum_dict[i] = volt_sum_get
                 else:
-                    raise TypeError(
-                        f"Battery {i} returns None value of /Voltages/Sum. Please check, if the setting "
-                        + "'BATTERY_CELL_DATA_FORMAT=1' in dbus-serialbattery config"
-                    )
+                    max_cell_voltage = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxCellVoltage")
+                    min_cell_voltage = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinCellVoltage")
+
+                    if max_cell_voltage is not None and min_cell_voltage is not None:
+                        VoltagesSum_dict[i] = ((max_cell_voltage + min_cell_voltage) / 2) * settings.NR_OF_CELLS_PER_BATTERY
+                    else:
+                        VoltagesSum_dict[i] = 0
 
                 # Battery state
                 step = "Read battery state"
@@ -1071,9 +1087,9 @@ class DbusAggBatService(object):
             else:
                 MaxChargeVoltage = self._fn._min(MaxChargeVoltage_list)
 
-            MaxChargeCurrent = self._fn._min(MaxChargeCurrent_list) * settings.NR_OF_BATTERIES
+            MaxChargeCurrent = sum(MaxChargeCurrent_list)
 
-            MaxDischargeCurrent = self._fn._min(MaxDischargeCurrent_list) * settings.NR_OF_BATTERIES
+            MaxDischargeCurrent = sum(MaxDischargeCurrent_list)
 
         AllowToCharge = self._fn._min(AllowToCharge_list)
         AllowToDischarge = self._fn._min(AllowToDischarge_list)
