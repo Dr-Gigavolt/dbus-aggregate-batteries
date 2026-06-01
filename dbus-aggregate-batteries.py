@@ -877,9 +877,29 @@ class DbusAggBatService(object):
                 # DC
                 # to detect error
                 step = "Read V, I, P"
-                Voltage += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
-                Current += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
-                Power += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
+                voltage_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
+                current_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
+                power_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
+
+                # Some battery services can temporarily publish None on D-Bus while updating.
+                # Do not add None to the aggregate values. Try to recover voltage from
+                # /Voltages/Sum and power from V*I; otherwise trigger the existing read retry.
+                if voltage_get is None:
+                    voltage_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Sum")
+
+                if power_get is None and voltage_get is not None and current_get is not None:
+                    power_get = voltage_get * current_get
+
+                if voltage_get is None or current_get is None or power_get is None:
+                    raise ValueError(
+                        "Missing mandatory D-Bus value while reading battery %s: "
+                        "Voltage=%s, Current=%s, Power=%s"
+                        % (i, voltage_get, current_get, power_get)
+                    )
+
+                Voltage += voltage_get
+                Current += current_get
+                Power += power_get
 
                 # Capacity
                 step = "Read and calculate capacity, SoC, Time to go"
