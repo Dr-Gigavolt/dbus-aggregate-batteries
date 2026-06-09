@@ -4,8 +4,6 @@
 Service to aggregate multiple serial batteries https://github.com/mr-manuel/venus-os_dbus-serialbattery
 to one virtual battery.
 
-modified by DJ0ABR to support Pylontech Batteries and mixed configurations made from Pylontech and DIY batteries
-
 Python location on Venus:
 /usr/bin/python3.8
 /usr/lib/python3.8/site-packages/
@@ -503,7 +501,15 @@ class DbusAggBatService(object):
                         # Check if Nr. of cells is equal
                         nr_of_cells = self._dbusMon.dbusmon.get_value(service, "/System/NrOfCellsPerBattery")
 
-                        if nr_of_cells is not None and nr_of_cells != settings.NR_OF_CELLS_PER_BATTERY:
+                        if settings.CAN_batteries:
+                            if nr_of_cells is not None and nr_of_cells != settings.NR_OF_CELLS_PER_BATTERY:
+                                logging.error("     |- Number of battery cells does not match config:")
+                                logging.error("        |- Cells found in battery:         %d" % nr_of_cells)
+                                logging.error("        |- Cells specified in config file: %d" % settings.NR_OF_CELLS_PER_BATTERY)
+                                logging.error("Exiting...")
+                                tt.sleep(settings.TIME_BEFORE_RESTART)
+                                sys.exit(1)
+                        elif nr_of_cells != settings.NR_OF_CELLS_PER_BATTERY:
                             logging.error("     |- Number of battery cells does not match config:")
                             logging.error("        |- Cells found in battery:         %d" % nr_of_cells)
                             logging.error("        |- Cells specified in config file: %d" % settings.NR_OF_CELLS_PER_BATTERY)
@@ -877,50 +883,62 @@ class DbusAggBatService(object):
                 # DC
                 # to detect error
                 step = "Read V, I, P"
-                voltage_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
-                current_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
-                power_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
 
-                # Some battery services can temporarily publish None on D-Bus while updating.
-                # Do not add None to the aggregate values. Try to recover voltage from
-                # /Voltages/Sum and power from V*I; otherwise trigger the existing read retry.
-                if voltage_get is None:
-                    voltage_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Sum")
+                if settings.CAN_batteries:
+                    voltage_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
+                    current_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
+                    power_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
 
-                if power_get is None and voltage_get is not None and current_get is not None:
-                    power_get = voltage_get * current_get
+                    if voltage_get is None:
+                        voltage_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Voltages/Sum")
 
-                if voltage_get is None or current_get is None or power_get is None:
-                    raise ValueError(
-                        "Missing mandatory D-Bus value while reading battery %s: "
-                        "Voltage=%s, Current=%s, Power=%s"
-                        % (i, voltage_get, current_get, power_get)
-                    )
+                    if power_get is None and voltage_get is not None and current_get is not None:
+                        power_get = voltage_get * current_get
 
-                Voltage += voltage_get
-                Current += current_get
-                Power += power_get
+                    if voltage_get is None or current_get is None or power_get is None:
+                        raise ValueError(
+                            "Missing mandatory D-Bus value while reading battery %s: "
+                            "Voltage=%s, Current=%s, Power=%s"
+                            % (i, voltage_get, current_get, power_get)
+                        )
+
+                    Voltage += voltage_get
+                    Current += current_get
+                    Power += power_get
+                else:
+                    Voltage += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
+                    Current += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
+                    Power += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
 
                 # Capacity
                 step = "Read and calculate capacity, SoC, Time to go"
                 InstalledCapacity += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
 
                 if not settings.OWN_SOC:
-                    ConsumedAmphours += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/ConsumedAmphours") or 0
-                    #Capacity += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Capacity") or 0
-                    capacity_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Capacity")
+                    if settings.CAN_batteries:
+                        ConsumedAmphours += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/ConsumedAmphours") or 0
+                        capacity_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Capacity")
 
-                    if capacity_get is not None:
-                        Capacity += capacity_get
-                    else:
-                        installed_capacity_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
+                        if capacity_get is not None:
+                            Capacity += capacity_get
+                        else:
+                            installed_capacity_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
+                            soc_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Soc")
+
+                            if installed_capacity_get is not None and soc_get is not None:
+                                Capacity += installed_capacity_get * soc_get / 100
+
                         soc_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Soc")
+                        installed_capacity_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
 
-                        if installed_capacity_get is not None and soc_get is not None:
-                            Capacity += installed_capacity_get * soc_get / 100
-                    Soc += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Soc") * self._dbusMon.dbusmon.get_value(
-                        self._batteries_dict[i], "/InstalledCapacity"
-                    ) or 0
+                        if soc_get is not None and installed_capacity_get is not None:
+                            Soc += soc_get * installed_capacity_get
+                    else:
+                        ConsumedAmphours += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/ConsumedAmphours")
+                        Capacity += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Capacity")
+                        Soc += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Soc") * self._dbusMon.dbusmon.get_value(
+                            self._batteries_dict[i], "/InstalledCapacity"
+                        )
                     ttg = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/TimeToGo")
                     if (ttg is not None) and (TimeToGo is not None):
                         TimeToGo += ttg * self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/InstalledCapacity")
@@ -968,7 +986,7 @@ class DbusAggBatService(object):
 
                 if volt_sum_get is not None:
                     VoltagesSum_dict[i] = volt_sum_get
-                else:
+                elif settings.CAN_batteries:
                     max_cell_voltage = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MaxCellVoltage")
                     min_cell_voltage = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/System/MinCellVoltage")
 
@@ -976,6 +994,11 @@ class DbusAggBatService(object):
                         VoltagesSum_dict[i] = ((max_cell_voltage + min_cell_voltage) / 2) * settings.NR_OF_CELLS_PER_BATTERY
                     else:
                         VoltagesSum_dict[i] = 0
+                else:
+                    raise TypeError(
+                        f"Battery {i} returns None value of /Voltages/Sum. Please check, if the setting "
+                        + "'BATTERY_CELL_DATA_FORMAT=1' in dbus-serialbattery config"
+                    )
 
                 # Battery state
                 step = "Read battery state"
@@ -1107,9 +1130,12 @@ class DbusAggBatService(object):
             else:
                 MaxChargeVoltage = self._fn._min(MaxChargeVoltage_list)
 
-            MaxChargeCurrent = sum(MaxChargeCurrent_list)
-
-            MaxDischargeCurrent = sum(MaxDischargeCurrent_list)
+            if settings.CAN_batteries:
+                MaxChargeCurrent = sum(MaxChargeCurrent_list)
+                MaxDischargeCurrent = sum(MaxDischargeCurrent_list)
+            else:
+                MaxChargeCurrent = self._fn._min(MaxChargeCurrent_list) * settings.NR_OF_BATTERIES
+                MaxDischargeCurrent = self._fn._min(MaxDischargeCurrent_list) * settings.NR_OF_BATTERIES
 
         AllowToCharge = self._fn._min(AllowToCharge_list)
         AllowToDischarge = self._fn._min(AllowToDischarge_list)
