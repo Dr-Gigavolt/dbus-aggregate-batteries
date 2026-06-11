@@ -261,6 +261,7 @@ TIME_BEFORE_RESTART: int = get_int_from_config("DEFAULT", "TIME_BEFORE_RESTART")
 
 # ----- Options -----
 CURRENT_FROM_VICTRON: bool = get_bool_from_config("DEFAULT", "CURRENT_FROM_VICTRON")
+CAN_batteries: bool = get_bool_from_config("DEFAULT", "CAN_batteries")
 USE_SMARTSHUNTS = get_smartshunts_from_config("DEFAULT", "USE_SMARTSHUNTS")
 INVERT_SMARTSHUNTS: bool = get_bool_from_config("DEFAULT", "INVERT_SMARTSHUNTS")
 SMARTSHUNT_AS_BATTERY_CURRENT: bool = get_bool_from_config("DEFAULT", "SMARTSHUNT_AS_BATTERY_CURRENT")
