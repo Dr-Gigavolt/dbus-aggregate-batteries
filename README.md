@@ -1,3 +1,8 @@
+## Version 4.3.20260611
+
+dj0abr:
+- Pylontech support added. Activate by setting CAN_batteries = True in config.ini
+
 ## Version 4.2.20260514
 
 baudje:
