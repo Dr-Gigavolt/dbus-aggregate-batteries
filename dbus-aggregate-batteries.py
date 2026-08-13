@@ -98,6 +98,8 @@ class DbusAggBatService(object):
         self._multi_connected = True
         # implementing hysteresis for allowing discharge
         self._fullyDischarged = False
+        # reactive-update coalescing guard (see _on_input_changed)
+        self._updating = False
         self._dbusConn = get_bus()
         logging.info("Initializing VeDbusService...")
         self._dbusservice = VeDbusService(servicename, self._dbusConn, register=False)
@@ -315,7 +317,7 @@ class DbusAggBatService(object):
 
     def _startMonitor(self):
         logging.info("Starting dbusmonitor...")
-        self._dbusMon = DbusMon()
+        self._dbusMon = DbusMon(value_changed_callback=self._on_input_changed)
         logging.info("dbusmonitor started")
 
     # ####################################################################
@@ -624,7 +626,7 @@ class DbusAggBatService(object):
             else:
                 self._timeOld = tt.time()
                 # if current from BMS start the _update loop
-                GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
+                GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
 
             # all OK, stop calling this function
             return False
@@ -695,7 +697,7 @@ class DbusAggBatService(object):
         else:
             self._timeOld = tt.time()
             # if no MPPTs start the _update loop
-            GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
+            GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
 
         # all OK, stop calling this function
         return False
@@ -731,7 +733,7 @@ class DbusAggBatService(object):
         logging.info("> %d MPPT(s) found." % (mpptsCount))
         if mpptsCount == settings.NR_OF_MPPTS:
             self._timeOld = tt.time()
-            GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
+            GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
             # all OK, stop calling this function
             return False
         elif self._searchTrials < settings.SEARCH_TRIALS:
@@ -803,6 +805,37 @@ class DbusAggBatService(object):
     # ### aggregate values of physical batteries, perform calculations, update Dbus ###
     # #################################################################################
     # #################################################################################
+
+    # ── Reactive updates (perf) ─────────────────────────────────────────
+    #
+    # Pattern from dbus-aggregate-smartshunts: instead of recomputing all
+    # aggregate values on a fixed 1 s timer regardless of change, run
+    # _update() when a monitored battery value actually changed.  The
+    # periodic timer remains as a slow floor (see REACTIVE_FLOOR_S) so
+    # time-integration, staleness detection and the read-failure counters
+    # keep ticking even on a completely silent bus.  Bursts are coalesced
+    # by the _updating guard: changes arriving while an update is queued
+    # or running are served by that run (it reads the monitor's current
+    # cache), not queued again.  With gated publishers upstream, an idle
+    # bank costs near-zero CPU; real changes propagate with less latency
+    # than the old fixed poll.
+    REACTIVE_FLOOR_S = 10
+
+    def _on_input_changed(self, service, path, options, changes, device_instance):
+        # Called on the dbusmonitor thread — only schedule, never compute.
+        if not str(service).startswith("com.victronenergy.battery"):
+            return
+        if self._updating:
+            return
+        self._updating = True
+        GLib.idle_add(self._update_reactive)
+
+    def _update_reactive(self):
+        try:
+            self._update()
+        finally:
+            self._updating = False
+        return False  # one-shot
 
     def _update(self):
 
