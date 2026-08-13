@@ -820,9 +820,6 @@ class DbusAggBatService(object):
 
         # Temperature
         Temperature = 0
-        # number of batteries that reported a temperature (may be fewer than
-        # NR_OF_BATTERIES while one serves stale data during a BLE outage)
-        temperature_count = 0
         # dictionary {'ID' : MaxCellTemperature, ... } for all physical batteries
         MaxCellTemp_dict = {}
         # dictionary {'ID' : MinCellTemperature, ... } for all physical batteries
@@ -950,12 +947,7 @@ class DbusAggBatService(object):
 
                 # Temperature
                 step = "Read temperatures"
-                # a battery serving stale data during a BLE outage may publish None here;
-                # average over the batteries that do report instead of failing the read
-                temperature_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Temperature")
-                if temperature_get is not None:
-                    Temperature += temperature_get
-                    temperature_count += 1
+                Temperature += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Temperature")
                 MaxCellTemp_dict[
                     "%s: %s"
                     % (
@@ -1068,9 +1060,12 @@ class DbusAggBatService(object):
                 AllowToBalance_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Io/AllowToBalance"))
 
             step = "Find max. and min. cell temperature of all batteries"
-            # skip constituents that have not reported cell temperatures (e.g. serving
-            # stale data during a BLE outage) instead of failing the read on a None
-            # comparison; publish None if no battery reports them at all
+            # skip constituents that have not reported cell extrema: a battery serving
+            # stale data before its first full BMS handshake has no per-cell source of
+            # truth (its fallback shunt cannot see cells). Deliberately loud, never
+            # silent — anything else publishing None here is a bug to chase.
+            for skipped in [k for k, v in MaxCellTemp_dict.items() if v is None]:
+                logging.warning("Cell temperature missing from '%s' — excluded from aggregation this cycle" % skipped)
             MaxCellTemp_dict = {k: v for k, v in MaxCellTemp_dict.items() if v is not None}
             MinCellTemp_dict = {k: v for k, v in MinCellTemp_dict.items() if v is not None}
             if MaxCellTemp_dict:
@@ -1087,7 +1082,9 @@ class DbusAggBatService(object):
                 MinCellTemp = None
 
             step = "Find max. and min. cell voltage of all batteries"
-            # same None tolerance as the cell temperatures above
+            # same None tolerance as the cell temperatures above, equally loud
+            for skipped in [k for k, v in MaxCellVoltage_dict.items() if v is None]:
+                logging.warning("Cell voltage missing from '%s' — excluded from aggregation this cycle" % skipped)
             MaxCellVoltage_dict = {k: v for k, v in MaxCellVoltage_dict.items() if v is not None}
             MinCellVoltage_dict = {k: v for k, v in MinCellVoltage_dict.items() if v is not None}
             if MaxCellVoltage_dict:
@@ -1131,7 +1128,7 @@ class DbusAggBatService(object):
 
         # averaging
         Voltage = Voltage / settings.NR_OF_BATTERIES
-        Temperature = Temperature / temperature_count if temperature_count > 0 else None
+        Temperature = Temperature / settings.NR_OF_BATTERIES
         VoltagesSum = sum(VoltagesSum_dict.values()) / settings.NR_OF_BATTERIES
 
         # find max in alarms
