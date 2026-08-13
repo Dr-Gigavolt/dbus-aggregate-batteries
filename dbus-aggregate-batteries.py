@@ -46,6 +46,84 @@ VERSION = "4.3.20260611-beta"
 _STATE_FILE_CHARGE = "/data/apps/dbus-aggregate-batteries/storedvalue_charge"
 _STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
 
+# ── Publish gate (perf) ──────────────────────────────────────────────────
+#
+# The update loop rewrites every D-Bus path each cycle with raw floats, so
+# nearly every path lands in every ItemsChanged payload even when nothing
+# meaningful changed. This proxy deduplicates exact repeats for all paths
+# and suppresses numeric flicker below a per-path significance threshold
+# (compared against the LAST PUBLISHED value, so cumulative drift still
+# emits). Control-relevant paths (/Info CVL/CCL/DCL), alarms, flags and
+# strings are deliberately NOT thresholded — they publish on any change.
+# A periodic heartbeat clears the cache so freshness watchers see full
+# re-publishes. Pattern proven in dbus-aggregate-smartshunts (quiet bank:
+# ~0.5 ItemsChanged/s -> 0).
+_SENTINEL = object()
+
+PUBLISH_GATE_THRESHOLDS = {
+    "/Dc/0/Voltage": 0.01,  # V
+    "/Dc/0/Current": 0.1,  # A
+    "/Dc/0/Power": 5.0,  # W
+    "/Dc/0/Temperature": 0.2,  # degC
+    "/TimeToGo": 60,  # s
+    "/ConsumedAmphours": 0.1,  # Ah
+    "/Soc": 0.1,  # %
+}
+
+PUBLISH_HEARTBEAT_S = 900
+
+
+class _GatedDbusServiceContext:
+    """Write-through context wrapper applying the publish gate."""
+
+    def __init__(self, proxy, ctx):
+        self._proxy = proxy
+        self._ctx = ctx
+
+    def __setitem__(self, path, value):
+        cache = self._proxy._cache
+        prev = cache.get(path, _SENTINEL)
+        if prev is value or prev == value:
+            return
+        if prev is not _SENTINEL and isinstance(value, (int, float)) and isinstance(prev, (int, float)):
+            threshold = PUBLISH_GATE_THRESHOLDS.get(path)
+            if threshold is not None and abs(value - prev) < threshold:
+                return
+        cache[path] = value
+        self._ctx[path] = value
+
+    def __getitem__(self, path):
+        return self._ctx[path]
+
+
+class _GatedDbusService:
+    """Proxy around VeDbusService adding dedup + significance gating."""
+
+    def __init__(self, svc):
+        self._svc = svc
+        self._cache = {}
+        self._last_heartbeat = tt.time()
+
+    def __enter__(self):
+        now = tt.time()
+        if now - self._last_heartbeat >= PUBLISH_HEARTBEAT_S:
+            self._last_heartbeat = now
+            self._cache.clear()
+        return _GatedDbusServiceContext(self, self._svc.__enter__())
+
+    def __exit__(self, *exc):
+        return self._svc.__exit__(*exc)
+
+    def __setitem__(self, path, value):
+        self._cache[path] = value
+        self._svc[path] = value
+
+    def __getitem__(self, path):
+        return self._svc[path]
+
+    def __getattr__(self, name):
+        return getattr(self._svc, name)
+
 
 def _write_atomic(path: str, content: str) -> None:
     """Write content atomically to path via a temporary file and os.replace."""
@@ -100,7 +178,7 @@ class DbusAggBatService(object):
         self._fullyDischarged = False
         self._dbusConn = get_bus()
         logging.info("Initializing VeDbusService...")
-        self._dbusservice = VeDbusService(servicename, self._dbusConn, register=False)
+        self._dbusservice = _GatedDbusService(VeDbusService(servicename, self._dbusConn, register=False))
         logging.info("VeDbusService initialized")
         self._timeOld = tt.time()
         # written when dynamic CVL limit activated
