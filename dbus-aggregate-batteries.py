@@ -100,6 +100,10 @@ class DbusAggBatService(object):
         self._fullyDischarged = False
         # reactive-update coalescing guard (see _on_input_changed)
         self._updating = False
+        # reactive triggers stay disarmed until the battery search completed
+        # and the periodic update loop has been started (_update is not safe
+        # to run before then)
+        self._reactive_ready = False
         self._dbusConn = get_bus()
         logging.info("Initializing VeDbusService...")
         self._dbusservice = VeDbusService(servicename, self._dbusConn, register=False)
@@ -626,6 +630,7 @@ class DbusAggBatService(object):
             else:
                 self._timeOld = tt.time()
                 # if current from BMS start the _update loop
+                self._reactive_ready = True
                 GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
 
             # all OK, stop calling this function
@@ -697,6 +702,7 @@ class DbusAggBatService(object):
         else:
             self._timeOld = tt.time()
             # if no MPPTs start the _update loop
+            self._reactive_ready = True
             GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
 
         # all OK, stop calling this function
@@ -733,6 +739,7 @@ class DbusAggBatService(object):
         logging.info("> %d MPPT(s) found." % (mpptsCount))
         if mpptsCount == settings.NR_OF_MPPTS:
             self._timeOld = tt.time()
+            self._reactive_ready = True
             GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
             # all OK, stop calling this function
             return False
@@ -825,7 +832,7 @@ class DbusAggBatService(object):
         # Called on the dbusmonitor thread — only schedule, never compute.
         if not str(service).startswith("com.victronenergy.battery"):
             return
-        if self._updating:
+        if not self._reactive_ready or self._updating:
             return
         self._updating = True
         GLib.idle_add(self._update_reactive)
