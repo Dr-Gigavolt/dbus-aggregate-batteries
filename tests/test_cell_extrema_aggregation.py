@@ -13,7 +13,7 @@ import logging
 import unittest
 from unittest import mock
 
-from driver_harness import Battery, DriverTestCase, WarningCollector, driver
+from driver_harness import Battery, DriverTestCase, driver
 
 
 class PartialCellVoltageDataTest(DriverTestCase):
@@ -52,9 +52,11 @@ class PartialCellVoltageDataTest(DriverTestCase):
         with self.assertLogs(level="WARNING") as captured:
             self.service._update()
 
-        voltage_warnings = [message for message in captured.output if "Cell voltage missing" in message]
+        voltage_warnings = [message for message in captured.output if "cell voltage missing" in message]
+        # both halves are missing, so the battery is announced once, not twice
         self.assertEqual(1, len(voltage_warnings))
-        self.assertIn(self.silent.max_voltage_key, voltage_warnings[0])
+        self.assertIn("'%s'" % self.silent.name, voltage_warnings[0])
+        self.assertIn("Max. and Min.", voltage_warnings[0])
         self.assertIn("excluded from aggregation this cycle", voltage_warnings[0])
         # the healthy battery must never be named as skipped
         self.assertNotIn(self.reporting.name, voltage_warnings[0])
@@ -89,9 +91,10 @@ class PartialCellTemperatureDataTest(DriverTestCase):
         with self.assertLogs(level="WARNING") as captured:
             self.service._update()
 
-        temperature_warnings = [message for message in captured.output if "Cell temperature missing" in message]
+        temperature_warnings = [message for message in captured.output if "cell temperature missing" in message]
         self.assertEqual(1, len(temperature_warnings))
-        self.assertIn(self.silent.max_temperature_key, temperature_warnings[0])
+        self.assertIn("'%s'" % self.silent.name, temperature_warnings[0])
+        self.assertIn("Max. and Min.", temperature_warnings[0])
         self.assertIn("excluded from aggregation this cycle", temperature_warnings[0])
 
 
@@ -248,32 +251,75 @@ class AsymmetricExtremaTest(DriverTestCase):
         self.assertNotIn("/System/MinCellTemperature", published)
         self.assertEqual(2, service._readTrials)
 
-    def test_min_only_missing_is_dropped_without_a_warning(self):
+    def test_min_only_missing_is_announced(self):
         """
-        Characterisation of a gap in the current implementation.
+        A battery dropped from only half of the aggregation is still named.
 
-        The warning loops iterate only over the *max* dictionaries, so a battery
-        that reports a max but no min is dropped from the min aggregation
-        silently. The aggregate below is still arithmetically defensible (a true
-        bank max and the best known min), but the skip is not loud, which is at
-        odds with the "deliberately loud, never silent" intent of this code.
+        The aggregate is arithmetically defensible (a true bank max and the best
+        known min), but the battery is out of the min aggregation, so the skip
+        must be as loud as any other. The message says which half went missing.
         """
         partial = Battery("Partial", max_cell_voltage=3.60, max_voltage_cell_id=1, min_cell_voltage=None, min_voltage_cell_id=2)
         healthy = Battery("Healthy", max_cell_voltage=3.40, max_voltage_cell_id=5, min_cell_voltage=3.25, min_voltage_cell_id=6)
         service = self.make_service([partial, healthy])
 
-        collector = WarningCollector()
-        root = logging.getLogger()
-        root.addHandler(collector)
-        try:
+        with self.assertLogs(level="WARNING") as captured:
             self.assertTrue(service._update())
-        finally:
-            root.removeHandler(collector)
+
+        warnings = [message for message in captured.output if "cell voltage missing" in message]
+        self.assertEqual(1, len(warnings))
+        self.assertIn("'Partial'", warnings[0])
+        self.assertIn("Min. cell voltage missing", warnings[0])
+        # only the min. went missing, so the max. must not be blamed as well
+        self.assertNotIn("Max.", warnings[0])
+        self.assertNotIn("Healthy", warnings[0])
 
         published = service._dbusservice.published
         self.assertEqual("Partial: 1", published["/System/MaxVoltageCellId"])
         self.assertEqual("Healthy: 6", published["/System/MinVoltageCellId"])
-        self.assertEqual([], collector.messages, "today's behaviour: the dropped min is not announced")
+
+    def test_max_only_missing_is_announced(self):
+        """The mirror image: a battery reporting a min but no max is named too."""
+        partial = Battery("Partial", max_cell_temperature=None, max_temperature_cell_id=1, min_cell_temperature=12.0, min_temperature_cell_id=2)
+        healthy = Battery("Healthy", max_cell_temperature=26.0, max_temperature_cell_id=5, min_cell_temperature=21.0, min_temperature_cell_id=6)
+        service = self.make_service([partial, healthy])
+
+        with self.assertLogs(level="WARNING") as captured:
+            self.assertTrue(service._update())
+
+        warnings = [message for message in captured.output if "cell temperature missing" in message]
+        self.assertEqual(1, len(warnings))
+        self.assertIn("'Partial'", warnings[0])
+        self.assertIn("Max. cell temperature missing", warnings[0])
+        self.assertNotIn("Min.", warnings[0])
+
+        published = service._dbusservice.published
+        self.assertEqual("Healthy: 5", published["/System/MaxTemperatureCellId"])
+        self.assertEqual("Partial: 2", published["/System/MinTemperatureCellId"])
+
+    def test_a_battery_missing_both_halves_is_warned_about_once(self):
+        """The common case (a battery serving nothing) must not warn twice per dimension."""
+        silent = Battery(
+            "Silent",
+            max_cell_voltage=None,
+            min_cell_voltage=None,
+            max_cell_temperature=None,
+            min_cell_temperature=None,
+        )
+        healthy = Battery("Healthy")
+        service = self.make_service([silent, healthy])
+
+        with self.assertLogs(level="WARNING") as captured:
+            self.assertTrue(service._update())
+
+        warnings = [record.getMessage() for record in captured.records if record.levelno >= logging.WARNING]
+        # exactly two warnings in total: one per dimension, not one per dictionary
+        self.assertEqual(2, len(warnings), "expected one warning per dimension, got %r" % warnings)
+        self.assertEqual(1, len([message for message in warnings if "cell voltage" in message]))
+        self.assertEqual(1, len([message for message in warnings if "cell temperature" in message]))
+        for message in warnings:
+            self.assertIn("Max. and Min.", message)
+            self.assertIn("'Silent'", message)
 
 
 if __name__ == "__main__":

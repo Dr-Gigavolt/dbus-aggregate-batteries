@@ -798,6 +798,31 @@ class DbusAggBatService(object):
             logging.warning(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return False
 
+    @staticmethod
+    def _warn_missing_extrema(quantity, max_dict, min_dict):
+        """
+        Name every constituent that is about to be excluded from an extrema aggregation.
+
+        Both the max. and the min. dictionary are inspected, so a battery that
+        reports one half of the pair but not the other is announced too: it is
+        still dropped from half of the aggregation, and a silently shrinking
+        aggregation is exactly the kind of thing nobody notices until a number
+        looks wrong months later.
+
+        A battery missing both halves (the common case for one serving nothing)
+        is announced once, saying both are missing, not twice. The dictionary
+        keys are "<custom name>: <cell id>" and the cell id of a missing value
+        is itself usually None, so the batteries are grouped by the name part.
+        """
+        missing = {}
+        for half, extrema_dict in (("Max.", max_dict), ("Min.", min_dict)):
+            for key, value in extrema_dict.items():
+                if value is None:
+                    missing.setdefault(key.rsplit(": ", 1)[0], []).append(half)
+
+        for battery, halves in missing.items():
+            logging.warning("%s %s missing from '%s' — excluded from aggregation this cycle" % (" and ".join(halves), quantity, battery))
+
     # #################################################################################
     # #################################################################################
     # ### aggregate values of physical batteries, perform calculations, update Dbus ###
@@ -1090,8 +1115,7 @@ class DbusAggBatService(object):
             # stale data before its first full BMS handshake has no per-cell source of
             # truth (its fallback shunt cannot see cells). Deliberately loud, never
             # silent — anything else publishing None here is a bug to chase.
-            for skipped in [k for k, v in MaxCellTemp_dict.items() if v is None]:
-                logging.warning("Cell temperature missing from '%s' — excluded from aggregation this cycle" % skipped)
+            self._warn_missing_extrema("cell temperature", MaxCellTemp_dict, MinCellTemp_dict)
             MaxCellTemp_dict = {k: v for k, v in MaxCellTemp_dict.items() if v is not None}
             MinCellTemp_dict = {k: v for k, v in MinCellTemp_dict.items() if v is not None}
             # if no battery at all reported cell temperatures this is a real read
@@ -1106,8 +1130,7 @@ class DbusAggBatService(object):
 
             step = "Find max. and min. cell voltage of all batteries"
             # same None tolerance as the cell temperatures above, equally loud
-            for skipped in [k for k, v in MaxCellVoltage_dict.items() if v is None]:
-                logging.warning("Cell voltage missing from '%s' — excluded from aggregation this cycle" % skipped)
+            self._warn_missing_extrema("cell voltage", MaxCellVoltage_dict, MinCellVoltage_dict)
             MaxCellVoltage_dict = {k: v for k, v in MaxCellVoltage_dict.items() if v is not None}
             MinCellVoltage_dict = {k: v for k, v in MinCellVoltage_dict.items() if v is not None}
             if not MaxCellVoltage_dict or not MinCellVoltage_dict:
