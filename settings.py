@@ -132,21 +132,12 @@ def get_smartshunts_from_config(group: str, option: str):
             # The driver match loop only handles those two types; bool/float/None
             # would crash it with a confusing error later, so reject up front.
             # bool is a subclass of int in Python — exclude it explicitly.
-            bad = [
-                (idx, item)
-                for idx, item in enumerate(val)
-                if isinstance(item, bool) or not isinstance(item, (int, str))
-            ]
+            bad = [(idx, item) for idx, item in enumerate(val) if isinstance(item, bool) or not isinstance(item, (int, str))]
             if bad:
-                errors_in_config.append(
-                    f"Invalid {option} list elements: {bad!r}. "
-                    "Each entry must be an int (VRM instance) or str (custom name)."
-                )
+                errors_in_config.append(f"Invalid {option} list elements: {bad!r}. Each entry must be an int (VRM instance) or str (custom name).")
                 return False
             return val
-    errors_in_config.append(
-        f"Invalid {option} value: {raw!r}. Expected True/False or list like [277]."
-    )
+    errors_in_config.append(f"Invalid {option} value: {raw!r}. Expected True/False or list like [277].")
     return False
 
 

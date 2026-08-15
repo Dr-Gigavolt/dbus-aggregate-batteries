@@ -898,8 +898,7 @@ class DbusAggBatService(object):
                     if voltage_get is None or current_get is None or power_get is None:
                         raise ValueError(
                             "Missing mandatory D-Bus value while reading battery %s: "
-                            "Voltage=%s, Current=%s, Power=%s"
-                            % (i, voltage_get, current_get, power_get)
+                            "Voltage=%s, Current=%s, Power=%s" % (i, voltage_get, current_get, power_get)
                         )
 
                     Voltage += voltage_get
@@ -1417,7 +1416,7 @@ class DbusAggBatService(object):
         if settings.OWN_SOC:
             Capacity = self._ownCharge
             Soc = 100 * self._ownCharge / InstalledCapacity
-            ConsumedAmphours = - InstalledCapacity + self._ownCharge   # zero if fully charged, otherwise negative
+            ConsumedAmphours = -InstalledCapacity + self._ownCharge  # zero if fully charged, otherwise negative
             if (self._dbusMon.dbusmon.get_value("com.victronenergy.system", "/SystemState/LowSoc") == 0) and (Current < 0):
                 TimeToGo = -3600 * self._ownCharge / Current
             else:
