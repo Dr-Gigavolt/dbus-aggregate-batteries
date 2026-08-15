@@ -554,5 +554,77 @@ class TestGateConfiguration(unittest.TestCase):
                 self.assertGreaterEqual(threshold, 0)
 
 
+class TestOneStepChangesAlwaysPublish(GateTestCase):
+    """A change of exactly one threshold step must never be suppressed.
+
+    The comparison base is the published float and the thresholds have no exact
+    binary representation, so a genuine one step change can come out fractionally
+    below its own threshold. These pairs are chosen because the subtraction really
+    does land short: each assertion below fails without the tolerance in the gate.
+    """
+
+    def test_soc_one_step_change_is_published(self):
+        # 100.0 - 99.9 == 0.09999999999999432, which is < the 0.1 threshold
+        self.assertLess(abs(100.0 - 99.9), 0.1)
+        self.write_each("/Soc", [99.9, 100.0])
+        self.assertEqual(self.written_for("/Soc"), [99.9, 100.0])
+
+    def test_voltage_one_step_change_is_published(self):
+        # 13.76 - 13.75 == 0.009999999999999787, which is < the 0.01 threshold
+        self.assertLess(abs(13.76 - 13.75), 0.01)
+        self.write_each("/Dc/0/Voltage", [13.75, 13.76])
+        self.assertEqual(self.written_for("/Dc/0/Voltage"), [13.75, 13.76])
+
+    def test_one_step_changes_publish_across_the_gated_paths(self):
+        # Each pair is a single step at that path's threshold whose subtraction
+        # lands fractionally short of it.
+        cases = [
+            ("/Soc", 50.2, 50.3),
+            ("/Dc/0/Current", 0.4, 0.5),
+            ("/Dc/0/Temperature", 0.8, 1.0),
+            ("/ConsumedAmphours", 0.5, 0.6),
+        ]
+        for path, first, second in cases:
+            with self.subTest(path=path):
+                threshold = aggbat.PUBLISH_GATE_THRESHOLDS[path]
+                self.assertLess(abs(second - first), threshold)
+                self.svc = driver_harness.RecordingDbusService()
+                self.gate = aggbat._GatedDbusService(self.svc)
+                self.write_each(path, [first, second])
+                self.assertEqual(self.written_for(path), [first, second])
+
+    def test_movement_genuinely_below_the_threshold_is_still_suppressed(self):
+        # The tolerance is an ulp of slack, not a loosened threshold.
+        self.write_each("/Soc", [50.0, 50.04])
+        self.assertEqual(self.written_for("/Soc"), [50.0])
+
+    def test_tolerance_is_far_smaller_than_any_threshold(self):
+        for path, threshold in aggbat.PUBLISH_GATE_THRESHOLDS.items():
+            if threshold:
+                with self.subTest(path=path):
+                    self.assertLess(aggbat._GATE_TOLERANCE, threshold / 1000)
+
+
+class TestBooleansAreNeverThresholded(GateTestCase):
+    """bool is a subclass of int; a flip has no magnitude and is always significant."""
+
+    def test_is_gateable_number_rejects_bool(self):
+        self.assertFalse(aggbat._is_gateable_number(True))
+        self.assertFalse(aggbat._is_gateable_number(False))
+
+    def test_is_gateable_number_accepts_int_and_float(self):
+        self.assertTrue(aggbat._is_gateable_number(0))
+        self.assertTrue(aggbat._is_gateable_number(52.0))
+
+    def test_a_bool_on_a_gated_path_publishes_every_flip(self):
+        # No shipped path is both gated and boolean; this pins the behaviour for
+        # anything added to the threshold map later. The threshold is 2 on
+        # purpose: a flip is a numeric difference of 1, so treating a bool as a
+        # number would suppress it, and the assertion below would fail.
+        with mock.patch.dict(aggbat.PUBLISH_GATE_THRESHOLDS, {"/Io/AllowToCharge": 2}):
+            self.write_each("/Io/AllowToCharge", [True, False, True])
+        self.assertEqual(self.written_for("/Io/AllowToCharge"), [True, False, True])
+
+
 if __name__ == "__main__":
     unittest.main()

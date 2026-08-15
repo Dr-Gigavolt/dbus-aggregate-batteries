@@ -88,6 +88,25 @@ PUBLISH_GATE_THRESHOLDS = {
 
 PUBLISH_HEARTBEAT_S = settings.PUBLISH_HEARTBEAT
 
+# The comparison base is the published float, not a rounded copy of it, and a
+# threshold like 0.1 has no exact binary representation. A genuine one step
+# change can therefore come out fractionally below its own threshold and be
+# suppressed: 100.0 - 99.9 is 0.09999999999999432, which is < 0.1. Roughly 60 %
+# of one step changes are affected at the shipped thresholds. One ulp-ish of
+# slack makes a real step always publish, while movement genuinely below the
+# threshold is still gated.
+_GATE_TOLERANCE = 1e-9
+
+
+def _is_gateable_number(value) -> bool:
+    """
+    True for values a threshold may be applied to.
+
+    bool is a subclass of int and must never be threshold compared: it has no
+    meaningful magnitude, and a True/False flip is always significant.
+    """
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
 
 class _GatedDbusServiceContext:
     """Write-through context wrapper applying the publish gate."""
@@ -106,9 +125,9 @@ class _GatedDbusServiceContext:
         # cycle. Treat NaN following NaN as unchanged.
         if prev != prev and value != value:
             return
-        if not self._proxy._heartbeat and isinstance(value, (int, float)) and isinstance(prev, (int, float)):
+        if not self._proxy._heartbeat and _is_gateable_number(value) and _is_gateable_number(prev):
             threshold = PUBLISH_GATE_THRESHOLDS.get(path)
-            if threshold is not None and abs(value - prev) < threshold:
+            if threshold is not None and abs(value - prev) < threshold - _GATE_TOLERANCE:
                 return
         self._ctx[path] = value
 
