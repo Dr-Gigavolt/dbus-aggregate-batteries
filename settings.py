@@ -258,6 +258,10 @@ READ_TRIALS: int = get_int_from_config("DEFAULT", "READ_TRIALS")
 # Seconds a battery may serve no data at all (typically while its driver restarts)
 # before it counts as a read failure. Nothing is published while waiting, so no
 # aggregate over a part of the bank can reach DVCC. 0 disables the waiting.
+# The default covers a clean single driver restart (roughly 50 s measured on a
+# Cerbo GX) with margin, and deliberately not a compound restart landing on one
+# still initialising (125 s to 134 s measured): a gap that long is a problem to
+# escalate, not one to sit out.
 MISSING_DATA_TOLERANCE: int = get_int_from_config("DEFAULT", "MISSING_DATA_TOLERANCE")
 check_config_issue(MISSING_DATA_TOLERANCE < 0, "MISSING_DATA_TOLERANCE must be 0 or greater.")
 

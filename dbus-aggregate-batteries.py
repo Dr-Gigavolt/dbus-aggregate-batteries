@@ -60,9 +60,11 @@ class ConstituentDataMissing(Exception):
     not wrong. The usual cause is not a BMS publishing nonsense but a battery
     driver restarting: its service leaves the bus entirely and the D-Bus monitor
     answers None for its paths rather than raising. That is a normal event in a
-    Venus OS system and lasts as long as the neighbouring driver needs (47 s
-    observed on a production Cerbo GX), so it must not consume READ_TRIALS and
-    must not take this process down.
+    Venus OS system and lasts as long as the neighbouring driver needs, roughly
+    50 s measured on a production Cerbo GX, so it must not consume READ_TRIALS
+    and must not take this process down. It is only ridden out for
+    MISSING_DATA_TOLERANCE, though: an absence far longer than a restart is a
+    problem in its own right and is escalated rather than hidden.
 
     While it lasts, nothing at all is published: Current and Power are sums over
     the batteries and Voltage and Temperature are divided by NR_OF_BATTERIES, so
