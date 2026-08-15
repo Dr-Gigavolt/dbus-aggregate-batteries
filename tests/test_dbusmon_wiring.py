@@ -1,0 +1,48 @@
+"""Tests that DbusMon hands the reactive callback through to DbusMonitor.
+
+DbusMonitor is replaced by a recording stub (see driver_stubs), so constructing
+DbusMon touches no D-Bus at all and the constructor arguments can be inspected.
+"""
+
+import unittest
+
+import driver_stubs
+
+
+class DbusMonWiringTestCase(unittest.TestCase):
+    def setUp(self):
+        self.dbusmon = driver_stubs.load_dbusmon()
+
+    def test_callback_is_passed_as_value_changed_callback(self):
+        def callback(service, path, options, changes, device_instance):  # pragma: no cover - never invoked
+            return None
+
+        monitor = self.dbusmon.DbusMon(value_changed_callback=callback).dbusmon
+        self.assertIs(monitor.kwargs["valueChangedCallback"], callback)
+
+    def test_aggregate_service_is_still_ignored(self):
+        monitor = self.dbusmon.DbusMon(value_changed_callback=lambda *args: None).dbusmon
+        self.assertEqual(monitor.kwargs["ignoreServices"], ["com.victronenergy.battery.aggregate"])
+
+    def test_callback_defaults_to_none(self):
+        monitor = self.dbusmon.DbusMon().dbusmon
+        self.assertIsNone(monitor.kwargs["valueChangedCallback"])
+
+    def test_monitor_list_is_passed_positionally_and_covers_batteries(self):
+        monitor = self.dbusmon.DbusMon().dbusmon
+        self.assertIn("com.victronenergy.battery", monitor.monitorlist)
+        self.assertIn("/Dc/0/Voltage", monitor.monitorlist["com.victronenergy.battery"])
+
+    def test_driver_registers_its_reactive_callback_with_dbusmon(self):
+        """_startMonitor must wire _on_input_changed through DbusMon into DbusMonitor."""
+        driver = driver_stubs.load_driver()
+        service = object.__new__(driver.DbusAggBatService)
+        service._startMonitor()
+
+        callback = driver_stubs.RecordingDbusMonitor.last_instance.kwargs["valueChangedCallback"]
+        self.assertEqual(callback.__func__, driver.DbusAggBatService._on_input_changed)
+        self.assertIs(callback.__self__, service)
+
+
+if __name__ == "__main__":
+    unittest.main()
