@@ -1068,18 +1068,15 @@ class DbusAggBatService(object):
                 logging.warning("Cell temperature missing from '%s' — excluded from aggregation this cycle" % skipped)
             MaxCellTemp_dict = {k: v for k, v in MaxCellTemp_dict.items() if v is not None}
             MinCellTemp_dict = {k: v for k, v in MinCellTemp_dict.items() if v is not None}
-            if MaxCellTemp_dict:
-                MaxTempCellId = max(MaxCellTemp_dict, key=MaxCellTemp_dict.get)
-                MaxCellTemp = MaxCellTemp_dict[MaxTempCellId]
-            else:
-                MaxTempCellId = None
-                MaxCellTemp = None
-            if MinCellTemp_dict:
-                MinTempCellId = min(MinCellTemp_dict, key=MinCellTemp_dict.get)
-                MinCellTemp = MinCellTemp_dict[MinTempCellId]
-            else:
-                MinTempCellId = None
-                MinCellTemp = None
+            # if no battery at all reported cell temperatures this is a real read
+            # failure, not a single stale constituent: handled by the except below,
+            # which counts the read trial and restarts after READ_TRIALS as before
+            if not MaxCellTemp_dict or not MinCellTemp_dict:
+                raise ValueError("No battery reported cell temperatures")
+            MaxTempCellId = max(MaxCellTemp_dict, key=MaxCellTemp_dict.get)
+            MaxCellTemp = MaxCellTemp_dict[MaxTempCellId]
+            MinTempCellId = min(MinCellTemp_dict, key=MinCellTemp_dict.get)
+            MinCellTemp = MinCellTemp_dict[MinTempCellId]
 
             step = "Find max. and min. cell voltage of all batteries"
             # same None tolerance as the cell temperatures above, equally loud
@@ -1087,18 +1084,12 @@ class DbusAggBatService(object):
                 logging.warning("Cell voltage missing from '%s' — excluded from aggregation this cycle" % skipped)
             MaxCellVoltage_dict = {k: v for k, v in MaxCellVoltage_dict.items() if v is not None}
             MinCellVoltage_dict = {k: v for k, v in MinCellVoltage_dict.items() if v is not None}
-            if MaxCellVoltage_dict:
-                MaxVoltageCellId = max(MaxCellVoltage_dict, key=MaxCellVoltage_dict.get)
-                MaxCellVoltage = MaxCellVoltage_dict[MaxVoltageCellId]
-            else:
-                MaxVoltageCellId = None
-                MaxCellVoltage = None
-            if MinCellVoltage_dict:
-                MinVoltageCellId = min(MinCellVoltage_dict, key=MinCellVoltage_dict.get)
-                MinCellVoltage = MinCellVoltage_dict[MinVoltageCellId]
-            else:
-                MinVoltageCellId = None
-                MinCellVoltage = None
+            if not MaxCellVoltage_dict or not MinCellVoltage_dict:
+                raise ValueError("No battery reported cell voltages")
+            MaxVoltageCellId = max(MaxCellVoltage_dict, key=MaxCellVoltage_dict.get)
+            MaxCellVoltage = MaxCellVoltage_dict[MaxVoltageCellId]
+            MinVoltageCellId = min(MinCellVoltage_dict, key=MinCellVoltage_dict.get)
+            MinCellVoltage = MinCellVoltage_dict[MinVoltageCellId]
 
         except Exception:
             (
