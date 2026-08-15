@@ -5,10 +5,16 @@ Unit tests for riding out a constituent that is not serving data.
 
 A battery driver that restarts takes its D-Bus service off the bus, and the
 monitor then answers None for its paths instead of raising. On a production
-Cerbo GX that lasted 47 s, during which the aggregate exhausted READ_TRIALS,
-exited, and restarted into a battery search that could not find the battery
-either. A neighbouring driver restarting is a normal event, not a fault of the
-aggregation.
+Cerbo GX that lasted roughly 50 s, during which the aggregate exhausted
+READ_TRIALS, exited, and restarted into a battery search that could not find the
+battery either. A neighbouring driver restarting is a normal event, not a fault
+of the aggregation.
+
+Riding it out is bounded on purpose. A restart landing on another that is still
+initialising was measured at 125 s to 134 s of absence, and that is deliberately
+outside the shipped window: an absence far longer than a restart is a problem of
+its own, and the escalation path below - named battery, measured gap, exceeded
+tolerance, handover - is a better answer than silence.
 
 What the driver does instead is bounded by MISSING_DATA_TOLERANCE seconds of
 wall clock time, and while it lasts it publishes *nothing*: Current and Power
@@ -32,6 +38,9 @@ from unittest import mock
 import driver_harness
 from driver_harness import Battery, DriverTestCase, FakeDbusMon, driver
 
+# the window the behaviour tests configure. Deliberately not the shipped default:
+# these tests are about what happens at the edges of the window, whatever it is
+# set to, and the default is asserted on its own in MissingDataToleranceConfigTest
 TOLERANCE = 60
 
 
@@ -423,19 +432,32 @@ class MissingDataToleranceConfigTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, directory, ignore_errors=True)
         return driver_harness.new_settings_module(directory)
 
-    def test_default_rides_out_a_battery_driver_restart(self):
+    def test_default_covers_a_single_driver_restart_with_margin(self):
         module = self._settings_for()
         driver_harness.exec_settings(module)
-        # 47 s was the worst case observed on a production Cerbo GX
-        self.assertEqual(60, module.MISSING_DATA_TOLERANCE)
+        self.assertEqual(120, module.MISSING_DATA_TOLERANCE)
+        # a clean single driver restart measured roughly 50 s on a Cerbo GX, and
+        # the window is worth having only if it clears that comfortably
+        self.assertGreater(module.MISSING_DATA_TOLERANCE, 2 * 50)
         self.assertEqual([], module.errors_in_config)
+
+    def test_default_does_not_cover_a_compound_restart(self):
+        """Deliberate: two minutes of absence is escalated, not sat out.
+
+        A restart landing on one still initialising measured 125 s to 134 s. A
+        default that swallowed it would also swallow a battery that is broken or
+        has been removed, in silence, for that long.
+        """
+        module = self._settings_for()
+        driver_harness.exec_settings(module)
+        self.assertLess(module.MISSING_DATA_TOLERANCE, 125)
 
     def test_the_shipped_default_is_used_without_a_user_config(self):
         module = self._settings_for(include_user_config=False)
         with self.assertRaises(SystemExit):
             # the shipped NR_OF_BATTERIES placeholder is invalid on purpose
             driver_harness.exec_settings(module)
-        self.assertEqual(60, module.MISSING_DATA_TOLERANCE)
+        self.assertEqual(120, module.MISSING_DATA_TOLERANCE)
 
     def test_it_can_be_overridden(self):
         module = self._settings_for({"MISSING_DATA_TOLERANCE": "120"})
