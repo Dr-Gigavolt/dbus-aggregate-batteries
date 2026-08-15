@@ -97,6 +97,16 @@ On start, the program searches for DBus services:
 The data from DBus are collected, processed and the results are sent back to DBus once per second.
 Dbus monitor defined in dbusmon.py is used instead of VeDbusItemImport which was very resource hungry (since V2.0). I strongly recommend to everyone modifying the code to keep this technique.
 
+### Batteries that stop serving data
+
+A battery driver that restarts takes its service off the DBus, and the monitor then returns `None` for its paths instead of reporting an error. A battery that has just registered but whose BMS has not answered yet behaves the same way for the values it cannot produce, typically the per-cell voltages and temperatures and the charge parameters. Both are normal events, so the aggregation waits for the battery instead of exiting and restarting.
+
+While a battery is not serving data, **nothing is published at all**. `Current` and `Power` are sums over all batteries and `Voltage` and `Temperature` are divided by `NR_OF_BATTERIES`, so an aggregate over the remaining batteries would under-report the bank current or skew the average; the same holds for `CVL`, `CCL` and `DCL`, which are the minimum over all batteries. The values published last stay on the DBus, so consumers see the last complete aggregate rather than a partial one.
+
+`MISSING_DATA_TOLERANCE` (default `60` seconds) is how long this is waited out. The restart of a battery driver has been observed to take 47 seconds. When the values are complete again, publishing resumes and the log says how long the gap lasted. When the tolerance is exceeded, the read is counted as a failure as before and the driver exits after `READ_TRIALS` so that the service manager restarts it. Set `MISSING_DATA_TOLERANCE = 0` to switch the waiting off and count read failures immediately.
+
+The log names the battery and the missing value when the gap opens, repeats it every 10 seconds while it lasts, and logs the recovery. A battery that reports no cell voltages or temperatures while others do is still only excluded from that aggregation, with a warning per cycle, as before.
+
 ### Smart Shunts as battery current source
 
 By default the aggregate computes bank current as `Quattro/Multiplus + solar chargers + DC-load shunts`. This is correct for most setups, but it cannot see current sources the driver does not enumerate — most notably Orion DC-DC converters (registered as `com.victronenergy.dcdc`), which often carry alternator charge into the battery bank. In that case the driver under-reports charge current and the alternator contribution is invisible to ESS, DVCC and VRM.

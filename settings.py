@@ -254,6 +254,13 @@ SMARTSHUNT_NAME_KEYWORD: str = config["DEFAULT"]["SMARTSHUNT_NAME_KEYWORD"]
 SMARTSHUNT_INSTANCE_NAME_PATH: str = config["DEFAULT"]["SMARTSHUNT_INSTANCE_NAME_PATH"]
 SEARCH_TRIALS: int = get_int_from_config("DEFAULT", "SEARCH_TRIALS")
 READ_TRIALS: int = get_int_from_config("DEFAULT", "READ_TRIALS")
+
+# Seconds a battery may serve no data at all (typically while its driver restarts)
+# before it counts as a read failure. Nothing is published while waiting, so no
+# aggregate over a part of the bank can reach DVCC. 0 disables the waiting.
+MISSING_DATA_TOLERANCE: int = get_int_from_config("DEFAULT", "MISSING_DATA_TOLERANCE")
+check_config_issue(MISSING_DATA_TOLERANCE < 0, "MISSING_DATA_TOLERANCE must be 0 or greater.")
+
 UPDATE_INTERVAL_FIND_DEVICES: int = get_int_from_config("DEFAULT", "UPDATE_INTERVAL_FIND_DEVICES")
 UPDATE_INTERVAL_DATA: int = get_int_from_config("DEFAULT", "UPDATE_INTERVAL_DATA")
 TIME_BEFORE_RESTART: int = get_int_from_config("DEFAULT", "TIME_BEFORE_RESTART")

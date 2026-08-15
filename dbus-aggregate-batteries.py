@@ -46,6 +46,31 @@ VERSION = "4.3.20260611-beta"
 _STATE_FILE_CHARGE = "/data/apps/dbus-aggregate-batteries/storedvalue_charge"
 _STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
 
+# How often the tolerated "a constituent is not serving data" state is repeated
+# in the log while it lasts. Opening and closing the gap are always logged; in
+# between, one line every this many seconds is enough to see that the gap is
+# still open, instead of one line per update cycle.
+MISSING_DATA_LOG_PERIOD = 10
+
+
+class ConstituentDataMissing(Exception):
+    """A constituent battery is not currently serving data the aggregate needs.
+
+    Distinct from every other read error because it means the values are absent,
+    not wrong. The usual cause is not a BMS publishing nonsense but a battery
+    driver restarting: its service leaves the bus entirely and the D-Bus monitor
+    answers None for its paths rather than raising. That is a normal event in a
+    Venus OS system and lasts as long as the neighbouring driver needs (47 s
+    observed on a production Cerbo GX), so it must not consume READ_TRIALS and
+    must not take this process down.
+
+    While it lasts, nothing at all is published: Current and Power are sums over
+    the batteries and Voltage and Temperature are divided by NR_OF_BATTERIES, so
+    an aggregate over the remaining subset would under-report the bank current
+    or skew the average, and a wrong number reaching DVCC is worse than a gap in
+    the published values. See DbusAggBatService._tolerate_missing_data().
+    """
+
 
 def _write_atomic(path: str, content: str) -> None:
     """Write content atomically to path via a temporary file and os.replace."""
@@ -57,12 +82,40 @@ def _write_atomic(path: str, content: str) -> None:
     os.replace(tmp.name, path)
 
 
+def _log_value(value, spec="%.1f"):
+    """Format a number for a log line, tolerating None.
+
+    A log line must never take the update loop down. "%.1f" % None raises
+    TypeError("must be real number, not NoneType"), and an exception escaping
+    _update() costs far more than a missing digit: GLib removes the source of a
+    callback that raised, so the aggregation would simply stop, quietly, with
+    the last published values frozen on the bus.
+
+    The guards in _update() are what keep the aggregated values themselves from
+    being None; this is the seat belt for the logging, not a substitute.
+    """
+    return "n/a" if value is None else spec % value
+
+
 def get_bus():
     """Return the shared system bus connection (singleton provided by dbus-python)."""
     return dbus.SessionBus() if "DBUS_SESSION_BUS_ADDRESS" in os.environ else dbus.SystemBus()
 
 
 class DbusAggBatService(object):
+
+    # State of the tolerated gap in which a constituent is not serving data.
+    # Kept at class level so that the window is defined for every instance from
+    # its first _update() on, without _update() having to guard against an
+    # attribute that has not been assigned yet.
+    _missingDataSince = None
+    """ tt.time() when the current gap opened, None while the data is complete """
+
+    _missingDataLastLog = None
+    """ tt.time() when the current gap was last mentioned in the log """
+
+    _missingDataExpired = False
+    """ True once the current gap has outlived MISSING_DATA_TOLERANCE """
 
     def __init__(self, servicename="com.victronenergy.battery.aggregate"):
         self._fn = Functions()
@@ -823,6 +876,71 @@ class DbusAggBatService(object):
         for battery, halves in missing.items():
             logging.warning("%s %s missing from '%s' — excluded from aggregation this cycle" % (" and ".join(halves), quantity, battery))
 
+    def _tolerate_missing_data(self, error):
+        """
+        Decide whether a constituent's absence is still to be waited out.
+
+        Returns True while the gap is inside MISSING_DATA_TOLERANCE, which asks
+        the caller to publish nothing at all and try again on the next cycle.
+        The service then simply keeps the values it published last: the last
+        complete aggregate is a better answer for DVCC than a fresh one computed
+        over a subset of the bank.
+
+        Returns False once the gap has lasted longer than the operator allows,
+        or immediately when the tolerance is 0, which restores the behaviour of
+        counting the read trial and eventually restarting.
+
+        Time is measured on the wall clock, not in failed attempts, because what
+        is being waited for is a wall clock event (a neighbouring driver coming
+        back), and because the number of attempts within a gap depends on how
+        chatty the *other* batteries are when the aggregation is driven by their
+        changes rather than by a timer.
+        """
+        if settings.MISSING_DATA_TOLERANCE <= 0:
+            return False
+
+        now = tt.time()
+
+        if self._missingDataSince is None:
+            self._missingDataSince = now
+            self._missingDataLastLog = None
+            self._missingDataExpired = False
+
+        # already given up on this gap: stay out of the way of the read failure
+        # path, and above all do not log the same line on every further cycle
+        if self._missingDataExpired:
+            return False
+
+        gap = now - self._missingDataSince
+
+        if gap > settings.MISSING_DATA_TOLERANCE:
+            self._missingDataExpired = True
+            logging.error(
+                "Battery data still missing after %.0f s, more than MISSING_DATA_TOLERANCE (%d s): %s. Treating it as a read failure."
+                % (gap, settings.MISSING_DATA_TOLERANCE, error)
+            )
+            return False
+
+        if self._missingDataLastLog is None:
+            logging.warning(
+                "Battery data missing: %s. Publishing nothing until it is complete again, for up to %d s." % (error, settings.MISSING_DATA_TOLERANCE)
+            )
+            self._missingDataLastLog = now
+        elif now - self._missingDataLastLog >= MISSING_DATA_LOG_PERIOD:
+            logging.warning("Battery data still missing after %.0f s: %s. Still publishing nothing." % (gap, error))
+            self._missingDataLastLog = now
+
+        return True
+
+    def _missing_data_complete_again(self):
+        """Close a tolerated gap after a successful read and say so in the log."""
+        if self._missingDataSince is None:
+            return
+        logging.warning("Battery data complete again after %.0f s. Publishing resumed." % (tt.time() - self._missingDataSince))
+        self._missingDataSince = None
+        self._missingDataLastLog = None
+        self._missingDataExpired = False
+
     # #################################################################################
     # #################################################################################
     # ### aggregate values of physical batteries, perform calculations, update Dbus ###
@@ -921,7 +1039,7 @@ class DbusAggBatService(object):
                         power_get = voltage_get * current_get
 
                     if voltage_get is None or current_get is None or power_get is None:
-                        raise ValueError(
+                        raise ConstituentDataMissing(
                             "Missing mandatory D-Bus value while reading battery %s: "
                             "Voltage=%s, Current=%s, Power=%s"
                             % (i, voltage_get, current_get, power_get)
@@ -935,16 +1053,15 @@ class DbusAggBatService(object):
                     current_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
                     power_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
 
-                    # A battery can be on the bus but not yet serving data (e.g. a BLE
-                    # BMS shortly after a restart). Do NOT skip such a constituent the
-                    # way the cell extrema below do: Current and Power are sums and
-                    # Voltage is divided by NR_OF_BATTERIES afterwards, so dropping a
-                    # battery would under-report the bank and publish a wrong number to
-                    # DVCC. The read trial / retry / restart path stays exactly as it
-                    # was; what changes is only that the failure names the battery and
-                    # the offending value instead of a bare TypeError from "+= None".
+                    # A battery can be on the bus but not serving data (e.g. its driver
+                    # restarting, which takes the service off the bus altogether). Do
+                    # NOT skip such a constituent the way the cell extrema below do:
+                    # Current and Power are sums and Voltage is divided by
+                    # NR_OF_BATTERIES afterwards, so dropping a battery would
+                    # under-report the bank and publish a wrong number to DVCC. Nothing
+                    # at all is published while this lasts; see ConstituentDataMissing.
                     if voltage_get is None or current_get is None or power_get is None:
-                        raise ValueError(
+                        raise ConstituentDataMissing(
                             "Missing mandatory D-Bus value while reading battery %s: "
                             "Voltage=%s, Current=%s, Power=%s" % (i, voltage_get, current_get, power_get)
                         )
@@ -994,9 +1111,9 @@ class DbusAggBatService(object):
 
                 # same reasoning as for V, I, P above: Temperature is divided by
                 # NR_OF_BATTERIES afterwards, so a skipped constituent would skew the
-                # published average. Retry as before, only with a diagnosable message.
+                # published average. Wait for the value instead of publishing without it.
                 if temperature_get is None:
-                    raise ValueError("Missing mandatory D-Bus value while reading battery %s: Temperature=%s" % (i, temperature_get))
+                    raise ConstituentDataMissing("Missing mandatory D-Bus value while reading battery %s: Temperature=%s" % (i, temperature_get))
 
                 Temperature += temperature_get
                 MaxCellTemp_dict[
@@ -1046,7 +1163,13 @@ class DbusAggBatService(object):
                     else:
                         VoltagesSum_dict[i] = 0
                 else:
-                    raise TypeError(
+                    # VoltagesSum is summed over the bank and divided by
+                    # NR_OF_BATTERIES, so it is as uncomputable without this
+                    # constituent as Voltage is: wait for it rather than publish an
+                    # average over the rest. A permanently misconfigured battery
+                    # still ends in the read failure path, only later and with the
+                    # same message.
+                    raise ConstituentDataMissing(
                         f"Battery {i} returns None value of /Voltages/Sum. Please check, if the setting "
                         + "'BATTERY_CELL_DATA_FORMAT=1' in dbus-serialbattery config"
                     )
@@ -1093,12 +1216,33 @@ class DbusAggBatService(object):
                 # Aggregate charge/discharge parameters
                 else:
                     step = "Read charge parameters"
+                    max_charge_current_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeCurrent")
+                    max_discharge_current_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxDischargeCurrent")
+                    max_charge_voltage_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeVoltage")
+
+                    # CVL, CCL and DCL are aggregated over the whole bank (the minimum,
+                    # for the currents multiplied by NR_OF_BATTERIES again), so a
+                    # constituent that does not report them — a battery that is
+                    # registered and serving DC values from its fallback shunt, before
+                    # its BMS answers — makes them uncomputable. Functions._min()
+                    # answers None for a list containing one, which would publish an
+                    # invalid CVL to DVCC, break "CCL = min * NR_OF_BATTERIES" with a
+                    # bare TypeError and take the periodic log line below down with
+                    # "must be real number, not NoneType". Wait for the values instead,
+                    # exactly as for V, I, P above.
+                    if max_charge_current_get is None or max_discharge_current_get is None or max_charge_voltage_get is None:
+                        raise ConstituentDataMissing(
+                            "Missing charge parameter while reading battery %s: "
+                            "MaxChargeVoltage=%s, MaxChargeCurrent=%s, MaxDischargeCurrent=%s"
+                            % (i, max_charge_voltage_get, max_charge_current_get, max_discharge_current_get)
+                        )
+
                     # list of max. charge currents to find minimum
-                    MaxChargeCurrent_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeCurrent"))
+                    MaxChargeCurrent_list.append(max_charge_current_get)
                     # list of max. discharge currents  to find minimum
-                    MaxDischargeCurrent_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxDischargeCurrent"))
+                    MaxDischargeCurrent_list.append(max_discharge_current_get)
                     # list of max. charge voltages  to find minimum
-                    MaxChargeVoltage_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeVoltage"))
+                    MaxChargeVoltage_list.append(max_charge_voltage_get)
                     # list of charge modes of batteries (Bulk, Absorption, Float, Keep always max voltage)
                     ChargeMode_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/ChargeMode"))
 
@@ -1115,14 +1259,17 @@ class DbusAggBatService(object):
             # stale data before its first full BMS handshake has no per-cell source of
             # truth (its fallback shunt cannot see cells). Deliberately loud, never
             # silent — anything else publishing None here is a bug to chase.
+            reported_MaxCellTemp = {k: v for k, v in MaxCellTemp_dict.items() if v is not None}
+            reported_MinCellTemp = {k: v for k, v in MinCellTemp_dict.items() if v is not None}
+            # if no battery at all reported cell temperatures nothing is aggregated
+            # this cycle, so the per-battery "excluded from aggregation" warnings
+            # below would be both wrong and, over a whole gap, a flood: raise first
+            # and let the tolerated-gap handling do the (rate limited) talking
+            if not reported_MaxCellTemp or not reported_MinCellTemp:
+                raise ConstituentDataMissing("No battery reported cell temperatures")
             self._warn_missing_extrema("cell temperature", MaxCellTemp_dict, MinCellTemp_dict)
-            MaxCellTemp_dict = {k: v for k, v in MaxCellTemp_dict.items() if v is not None}
-            MinCellTemp_dict = {k: v for k, v in MinCellTemp_dict.items() if v is not None}
-            # if no battery at all reported cell temperatures this is a real read
-            # failure, not a single stale constituent: handled by the except below,
-            # which counts the read trial and restarts after READ_TRIALS as before
-            if not MaxCellTemp_dict or not MinCellTemp_dict:
-                raise ValueError("No battery reported cell temperatures")
+            MaxCellTemp_dict = reported_MaxCellTemp
+            MinCellTemp_dict = reported_MinCellTemp
             MaxTempCellId = max(MaxCellTemp_dict, key=MaxCellTemp_dict.get)
             MaxCellTemp = MaxCellTemp_dict[MaxTempCellId]
             MinTempCellId = min(MinCellTemp_dict, key=MinCellTemp_dict.get)
@@ -1130,17 +1277,29 @@ class DbusAggBatService(object):
 
             step = "Find max. and min. cell voltage of all batteries"
             # same None tolerance as the cell temperatures above, equally loud
+            reported_MaxCellVoltage = {k: v for k, v in MaxCellVoltage_dict.items() if v is not None}
+            reported_MinCellVoltage = {k: v for k, v in MinCellVoltage_dict.items() if v is not None}
+            if not reported_MaxCellVoltage or not reported_MinCellVoltage:
+                raise ConstituentDataMissing("No battery reported cell voltages")
             self._warn_missing_extrema("cell voltage", MaxCellVoltage_dict, MinCellVoltage_dict)
-            MaxCellVoltage_dict = {k: v for k, v in MaxCellVoltage_dict.items() if v is not None}
-            MinCellVoltage_dict = {k: v for k, v in MinCellVoltage_dict.items() if v is not None}
-            if not MaxCellVoltage_dict or not MinCellVoltage_dict:
-                raise ValueError("No battery reported cell voltages")
+            MaxCellVoltage_dict = reported_MaxCellVoltage
+            MinCellVoltage_dict = reported_MinCellVoltage
             MaxVoltageCellId = max(MaxCellVoltage_dict, key=MaxCellVoltage_dict.get)
             MaxCellVoltage = MaxCellVoltage_dict[MaxVoltageCellId]
             MinVoltageCellId = min(MinCellVoltage_dict, key=MinCellVoltage_dict.get)
             MinCellVoltage = MinCellVoltage_dict[MinVoltageCellId]
 
-        except Exception:
+        except Exception as error:
+            # A constituent that is not serving data at all is not a failure of
+            # ours: a battery driver restarting takes its service off the bus and
+            # the monitor answers None for its paths. Publish nothing while that
+            # lasts and come back on the next cycle, rather than restarting this
+            # process over a neighbour's normal restart. Every other exception
+            # keeps the read trial semantics below unchanged, and so does this
+            # one once the gap outlives MISSING_DATA_TOLERANCE.
+            if isinstance(error, ConstituentDataMissing) and self._tolerate_missing_data(error):
+                return True
+
             (
                 exception_type,
                 exception_object,
@@ -1189,7 +1348,9 @@ class DbusAggBatService(object):
 
         # find max. charge voltage (if needed)
         if not settings.OWN_CHARGE_PARAMETERS:
-            if settings.KEEP_MAX_CVL and any("Float" in item for item in ChargeMode_list):
+            # a battery that does not publish /Info/ChargeMode at all reads as None
+            # here, which must not decide the CVL and must not raise either
+            if settings.KEEP_MAX_CVL and any(item is not None and "Float" in item for item in ChargeMode_list):
                 MaxChargeVoltage = self._fn._max(MaxChargeVoltage_list)
 
             else:
@@ -1314,6 +1475,11 @@ class DbusAggBatService(object):
 
         # must be reset after try-except of all reads
         self._readTrials = 1
+
+        # every constituent answered: close a tolerated gap if one was open. The
+        # Coulomb counter below picks the elapsed time up from _timeOld, which no
+        # skipped cycle touches, so the gap is integrated exactly once.
+        self._missing_data_complete_again()
 
         ####################################################################################################
         # Calculate own charge/discharge parameters (overwrite the values received from the SerialBattery) #
@@ -1462,8 +1628,13 @@ class DbusAggBatService(object):
         # own Coulomb counter (runs even the BMS values are used) #
         ###########################################################
 
-        deltaTime = tt.time() - self._timeOld
-        self._timeOld = tt.time()
+        # one sample for both, so that no time falls between the two reads. Cycles
+        # that published nothing (a tolerated gap, a counted read trial) never got
+        # here, so _timeOld still points at the last integrated cycle and their
+        # elapsed time is integrated here, once.
+        timeNow = tt.time()
+        deltaTime = timeNow - self._timeOld
+        self._timeOld = timeNow
         if Current > 0:
             # charging (with efficiency)
             self._ownCharge += Current * (deltaTime / 3600) * settings.BATTERY_EFFICIENCY
@@ -1588,16 +1759,31 @@ class DbusAggBatService(object):
         if settings.LOG_PERIOD > 0 and int(tt.time()) - self._logLastPrintTimeStamp >= settings.LOG_PERIOD:
             self._logLastPrintTimeStamp = int(tt.time())
             logging.info(f"Repetitive logging (every {settings.LOG_PERIOD}s)")
-            logging.info("|- CVL: %.1fV, CCL: %.0fA, DCL: %.0fA" % (MaxChargeVoltage, MaxChargeCurrent, MaxDischargeCurrent))
-            logging.info("|- Bat. voltage: %.1fV, Bat. current: %.0fA, SoC: %.1f%%, Balancing state: %d" % (Voltage, Current, Soc, self._balancing))
             logging.info(
-                "|- Min. cell voltage: %s: %.3fV, Max. cell voltage: %s: %.3fV, difference: %.3fV"
+                "|- CVL: %sV, CCL: %sA, DCL: %sA"
+                % (
+                    _log_value(MaxChargeVoltage),
+                    _log_value(MaxChargeCurrent, "%.0f"),
+                    _log_value(MaxDischargeCurrent, "%.0f"),
+                )
+            )
+            logging.info(
+                "|- Bat. voltage: %sV, Bat. current: %sA, SoC: %s%%, Balancing state: %s"
+                % (
+                    _log_value(Voltage),
+                    _log_value(Current, "%.0f"),
+                    _log_value(Soc),
+                    _log_value(self._balancing, "%d"),
+                )
+            )
+            logging.info(
+                "|- Min. cell voltage: %s: %sV, Max. cell voltage: %s: %sV, difference: %sV"
                 % (
                     MinVoltageCellId,
-                    MinCellVoltage,
+                    _log_value(MinCellVoltage, "%.3f"),
                     MaxVoltageCellId,
-                    MaxCellVoltage,
-                    MaxCellVoltage - MinCellVoltage,
+                    _log_value(MaxCellVoltage, "%.3f"),
+                    _log_value(None if MinCellVoltage is None or MaxCellVoltage is None else MaxCellVoltage - MinCellVoltage, "%.3f"),
                 )
             )
 
