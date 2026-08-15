@@ -99,9 +99,16 @@ class PartialCellTemperatureDataTest(DriverTestCase):
 
 
 class EveryBatterySkippedTest(DriverTestCase):
-    """No battery reports extrema: a real read failure, handed to the caller's retry path."""
+    """No battery reports extrema: nothing is aggregated, so nothing is published.
+
+    Run with MISSING_DATA_TOLERANCE = 0, so that the exception reaches the read
+    failure handler on the first cycle. By default the driver first waits the
+    constituents out for MISSING_DATA_TOLERANCE seconds, publishing nothing
+    either way; that window is the subject of test_missing_data_tolerance.py.
+    """
 
     def _all_silent_voltage_service(self, **overrides):
+        overrides.setdefault("MISSING_DATA_TOLERANCE", 0)
         batteries = [
             Battery("BatteryA", max_cell_voltage=None, min_cell_voltage=None),
             Battery("BatteryB", max_cell_voltage=None, min_cell_voltage=None),
@@ -109,6 +116,7 @@ class EveryBatterySkippedTest(DriverTestCase):
         return self.make_service(batteries, **overrides)
 
     def _all_silent_temperature_service(self, **overrides):
+        overrides.setdefault("MISSING_DATA_TOLERANCE", 0)
         batteries = [
             Battery("BatteryA", max_cell_temperature=None, min_cell_temperature=None),
             Battery("BatteryB", max_cell_temperature=None, min_cell_temperature=None),
@@ -225,7 +233,8 @@ class AsymmetricExtremaTest(DriverTestCase):
 
     def test_single_battery_with_max_but_no_min_voltage_is_a_read_failure(self):
         battery = Battery("Solo", max_cell_voltage=3.44, max_voltage_cell_id=1, min_cell_voltage=None, min_voltage_cell_id=2)
-        service = self.make_service([battery])
+        # again with the waiting switched off, see EveryBatterySkippedTest
+        service = self.make_service([battery], MISSING_DATA_TOLERANCE=0)
 
         with self.assertLogs(level="ERROR") as captured:
             self.assertTrue(service._update())
@@ -240,7 +249,8 @@ class AsymmetricExtremaTest(DriverTestCase):
 
     def test_single_battery_with_max_but_no_min_temperature_is_a_read_failure(self):
         battery = Battery("Solo", max_cell_temperature=30.0, max_temperature_cell_id=1, min_cell_temperature=None, min_temperature_cell_id=2)
-        service = self.make_service([battery])
+        # again with the waiting switched off, see EveryBatterySkippedTest
+        service = self.make_service([battery], MISSING_DATA_TOLERANCE=0)
 
         with self.assertLogs(level="ERROR") as captured:
             self.assertTrue(service._update())

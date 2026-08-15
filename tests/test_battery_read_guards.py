@@ -12,9 +12,13 @@ produced a bare ``TypeError: unsupported operand type(s) for +=: 'int' and
 The guards deliberately do NOT skip the constituent the way the cell extrema
 aggregation does: Current and Power are sums across batteries and Voltage and
 Temperature are divided by NR_OF_BATTERIES afterwards, so dropping a battery
-would publish a wrong bank number. The read trial / retry / restart path is
-therefore unchanged; these tests pin down that the failure is now diagnosable
-and that no partial accumulation happens before it.
+would publish a wrong bank number. These tests pin down that the failure is
+diagnosable and that no partial accumulation happens before it.
+
+They run with MISSING_DATA_TOLERANCE = 0, the configuration in which a missing
+value is handed to the read failure handler immediately. What the driver does by
+default — wait the constituent out for MISSING_DATA_TOLERANCE seconds, still
+publishing nothing — is the subject of test_missing_data_tolerance.py.
 
 The real driver is exercised; see driver_harness for how it is loaded and wired
 off-device.
@@ -40,7 +44,7 @@ class MandatoryDcValueGuardTest(DriverTestCase):
     """A None V, I, P or temperature must name the battery and the values."""
 
     def _run_expecting_failure(self, batteries):
-        service = self.make_service(batteries)
+        service = self.make_service(batteries, MISSING_DATA_TOLERANCE=0)
         with self.assertLogs(level="ERROR") as captured:
             # the existing read-failure handler swallows the exception, counts
             # the trial and asks to be called again
@@ -54,7 +58,7 @@ class MandatoryDcValueGuardTest(DriverTestCase):
         self.assertEqual(1, len(messages), "expected exactly one mandatory-value failure, got %r" % messages)
         self.assertIn(battery_name, messages[0])
         self.assertIn(expected_fragment, messages[0])
-        self.assertIn("ValueError", messages[0], "must be the explicit ValueError, not a bare TypeError")
+        self.assertIn("ConstituentDataMissing", messages[0], "must be the explicit exception, not a bare TypeError")
         self.assertNotIn("TypeError", messages[0])
 
     def test_none_voltage_names_the_battery_and_the_values(self):
@@ -101,9 +105,9 @@ class MandatoryDcValueGuardTest(DriverTestCase):
         self._assert_message(captured, "Solo", "Voltage=None, Current=None, Power=None")
 
     def test_exhausted_read_trials_still_restart_the_driver(self):
-        """The guard changes the message, not the retry/restart behaviour."""
+        """Without the waiting window the retry/restart behaviour is the old one."""
         broken = Battery("Solo", voltage=None)
-        service = self.make_service([broken], READ_TRIALS=1)
+        service = self.make_service([broken], READ_TRIALS=1, MISSING_DATA_TOLERANCE=0)
         service._readTrials = 1
 
         with mock.patch("time.sleep") as sleep:
@@ -130,7 +134,7 @@ class NoPartialAccumulationTest(DriverTestCase):
     def test_voltage_and_current_are_not_accumulated_when_power_is_none(self):
         # a single battery, so any accumulation would have to come from this one
         broken = Battery("Solo", voltage=52.0, current=12.0, power=None)
-        service = self.make_service([broken])
+        service = self.make_service([broken], MISSING_DATA_TOLERANCE=0)
 
         with self.assertLogs(level="ERROR") as captured:
             self.assertTrue(service._update())
@@ -141,7 +145,7 @@ class NoPartialAccumulationTest(DriverTestCase):
 
     def test_temperature_is_not_accumulated_when_it_is_none(self):
         broken = Battery("Solo", voltage=52.0, temperature=None)
-        service = self.make_service([broken])
+        service = self.make_service([broken], MISSING_DATA_TOLERANCE=0)
 
         with self.assertLogs(level="ERROR") as captured:
             self.assertTrue(service._update())
