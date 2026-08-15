@@ -11,14 +11,10 @@ repository's own config.ini.
 
 import configparser
 import logging
-import os
 import shutil
-import sys
 import unittest
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-import support  # noqa: E402
+import driver_harness
 
 
 THRESHOLD_OPTIONS = (
@@ -40,21 +36,21 @@ class SettingsTestCase(unittest.TestCase):
         self.addCleanup(logging.disable, logging.NOTSET)
 
     def make_dir(self, overrides=None):
-        directory = support.make_config_dir(overrides)
+        directory = driver_harness.make_config_dir(overrides)
         self.addCleanup(shutil.rmtree, directory, True)
         return directory
 
     def load(self, overrides=None):
         """Load settings with the given config.ini overrides, expecting success."""
-        module = support.load_settings(self.make_dir(overrides))
+        module = driver_harness.load_settings(self.make_dir(overrides))
         self.assertEqual(module.errors_in_config, [])
         return module
 
     def load_expecting_exit(self, overrides):
         """Load settings expecting sys.exit(1); return the collected errors."""
-        module = support.new_settings_module(self.make_dir(overrides))
+        module = driver_harness.new_settings_module(self.make_dir(overrides))
         with self.assertRaises(SystemExit) as raised:
-            support.exec_settings(module)
+            driver_harness.exec_settings(module)
         self.assertEqual(raised.exception.code, 1)
         return module.errors_in_config
 
@@ -70,7 +66,7 @@ class TestDefaults(SettingsTestCase):
     def setUp(self):
         super(TestDefaults, self).setUp()
         self.defaults = configparser.ConfigParser()
-        self.defaults.read(support.CONFIG_DEFAULT_PATH)
+        self.defaults.read(driver_harness.CONFIG_DEFAULT_PATH)
 
     def test_thresholds_default_to_the_shipped_config(self):
         module = self.load()

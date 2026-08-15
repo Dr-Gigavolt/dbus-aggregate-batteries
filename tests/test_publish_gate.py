@@ -6,94 +6,28 @@ numeric changes below a per-path threshold, compared against the value
 currently published on D-Bus, and bypasses those thresholds once every
 ``PUBLISH_HEARTBEAT_S``.
 
-The fake service below mirrors the parts of velib_python that matter here:
-``ServiceContext.__getitem__`` returns the currently published value, and
-``VeDbusItemExport._local_set_value`` drops a write whose value is unchanged
-(so "not written" and "not emitted on D-Bus" are the same thing).
+``driver_harness.RecordingDbusService`` mirrors the parts of velib_python that
+matter here: ``ServiceContext.__getitem__`` returns the currently published
+value, and ``VeDbusItemExport._local_set_value`` drops a write whose value is
+unchanged (so "not written" and "not emitted on D-Bus" are the same thing).
 
 The driver imports ``dbus``, ``vedbus`` and ``gi.repository`` which are only
 available on Venus OS, so those modules are stubbed in ``sys.modules`` before
-the driver is loaded (see ``support.py``). The driver file name contains dashes,
-so it is loaded by path with ``importlib``.
+the driver is loaded, and ``settings`` is executed against a generated
+config.ini; ``driver_harness`` does all of that once for every suite. The driver
+file name contains dashes, so it is loaded by path with ``importlib``.
 """
 
-import atexit
 import math
-import os
-import shutil
-import sys
 import unittest
 from unittest import mock
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import driver_harness
 
-import support  # noqa: E402
-
-
-_CONFIG_DIR = support.make_config_dir()
-atexit.register(shutil.rmtree, _CONFIG_DIR, True)
-SETTINGS = support.load_settings(_CONFIG_DIR)
-aggbat = support.load_driver(SETTINGS)
+SETTINGS = driver_harness.settings
+aggbat = driver_harness.driver
 
 NAN = float("nan")
-
-
-class FakeServiceContext(object):
-    """Stand-in for velib_python's ``ServiceContext``."""
-
-    def __init__(self, service):
-        self._service = service
-
-    def __setitem__(self, path, value):
-        self._service._write(path, value)
-
-    def __getitem__(self, path):
-        return self._service[path]
-
-
-class FakeVeDbusService(object):
-    """Records every write that reaches the D-Bus layer."""
-
-    def __init__(self):
-        self.written = []
-        self.values = {}
-        self.enter_count = 0
-        self.exit_count = 0
-        self.registered = False
-
-    # ----- velib-ish API used by the driver -----
-    def add_path(self, path, value=None, **kwargs):
-        """Register a path with its initial value. Registration is not a write."""
-        self.values[path] = value
-
-    def register(self):
-        self.registered = True
-        return "registered"
-
-    def __enter__(self):
-        self.enter_count += 1
-        return FakeServiceContext(self)
-
-    def __exit__(self, *exc):
-        self.exit_count += 1
-        return False
-
-    def __setitem__(self, path, value):
-        self._write(path, value)
-
-    def __getitem__(self, path):
-        if path not in self.values:
-            raise KeyError(path)
-        return self.values[path]
-
-    # ----- test helpers -----
-    def _write(self, path, value):
-        self.written.append((path, value))
-        self.values[path] = value
-
-    def foreign_write(self, path, value):
-        """Another process writing the path over D-Bus (VeDbusItemExport.SetValue)."""
-        self.values[path] = value
 
 
 class FakeClock(object):
@@ -135,7 +69,7 @@ class GateTestCase(unittest.TestCase):
     """Common fixture: a gate over a fake service, with an injected clock."""
 
     def setUp(self):
-        self.svc = FakeVeDbusService()
+        self.svc = driver_harness.RecordingDbusService()
         self.clock = FakeClock()
         clock_patcher = mock.patch.object(aggbat, "tt", self.clock)
         clock_patcher.start()
