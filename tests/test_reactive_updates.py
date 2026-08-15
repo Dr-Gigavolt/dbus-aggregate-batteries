@@ -9,6 +9,9 @@ calls, so the queued idle callback runs only when a test decides to run it.
 """
 
 import inspect
+import logging
+import os
+import re
 import unittest
 
 import driver_harness
@@ -39,6 +42,34 @@ class _DbusString:
 
     def __str__(self):
         return self._value
+
+
+def _line_of(func, needle):
+    """Absolute source line number of the first line of ``func`` that contains ``needle``."""
+    lines, first = inspect.getsourcelines(func)
+    for offset, text in enumerate(lines):
+        if needle in text:
+            return first + offset
+    raise AssertionError(f"{needle!r} not found in {func.__name__}")
+
+
+def _innermost_failure():
+    """The statement that actually fails, mimicking the production TypeError from a deep D-Bus read."""
+    raise TypeError("must be real number, not NoneType")
+
+
+def _failing_recompute():
+    """A frame between _update() and the raise, so the raising frame is nowhere near the handler's own."""
+    _innermost_failure()
+
+
+# The line the handler is expected to name.  It is several frames below the
+# self._update() call site, which is what a handler reading sys.exc_info()[2]
+# directly would report instead.
+RAISING_LINE = _line_of(_innermost_failure, "raise TypeError")
+
+# Tail of the logged message: "... in <file> line #<n>".
+LOCATION_RE = re.compile(r" in (?P<file>.+) line #(?P<line>\d+)$")
 
 
 NON_BATTERY_SERVICES = [
@@ -182,7 +213,8 @@ class ReactiveSchedulingTestCase(unittest.TestCase):
         self.assertIs(service._update_reactive(), False)
 
     def test_failing_update_is_logged_instead_of_escaping_the_idle_callback(self):
-        service = self._make_service(update=_RecordingUpdate(raises=RuntimeError("boom")))
+        """The failure is logged, and the location names the statement that raised rather than the call site."""
+        service = self._make_service(update=_RecordingUpdate(side_effect=_failing_recompute))
         service._on_input_changed(*self._change("com.victronenergy.battery.ttyUSB0"))
 
         with self.assertLogs(level="ERROR") as captured:
@@ -191,8 +223,32 @@ class ReactiveSchedulingTestCase(unittest.TestCase):
         self.assertEqual(results, [False], "the callback must stay one-shot even when the update failed")
         self.assertEqual(len(captured.records), 1)
         message = captured.records[0].getMessage()
-        self.assertIn("RuntimeError('boom')", message)
-        self.assertIn("dbus-aggregate-batteries.py", message)
+        self.assertIn("TypeError('must be real number, not NoneType')", message)
+
+        location = LOCATION_RE.search(message)
+        self.assertIsNotNone(location, f"no '<file> line #<n>' location in the logged message: {message}")
+        self.assertEqual(os.path.basename(location.group("file")), os.path.basename(__file__))
+        self.assertEqual(int(location.group("line")), RAISING_LINE, "the logged line must be the raise, not a frame above it")
+        self.assertNotIn(
+            "dbus-aggregate-batteries.py",
+            message,
+            "the outermost frame is the self._update() call site, which is never where the failure is",
+        )
+
+    def test_logged_failure_carries_the_frames_between_the_callback_and_the_raise(self):
+        """One line is scannable, but the chain is what says how the recompute reached the failing statement."""
+        service = self._make_service(update=_RecordingUpdate(side_effect=_failing_recompute))
+        service._on_input_changed(*self._change("com.victronenergy.battery.ttyUSB0"))
+
+        with self.assertLogs(level="ERROR") as captured:
+            self.glib.run_pending_idle()
+
+        record = captured.records[0]
+        self.assertIsNotNone(record.exc_info, "the record must carry the exception, not only a formatted summary")
+        formatted = logging.Formatter().format(record)
+        for frame in ("_update_reactive", "_failing_recompute", "_innermost_failure"):
+            with self.subTest(frame=frame):
+                self.assertIn(frame, formatted)
 
     def test_updating_guard_is_cleared_when_update_raises(self):
         service = self._make_service(update=_RecordingUpdate(raises=RuntimeError("boom")))

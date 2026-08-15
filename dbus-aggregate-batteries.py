@@ -865,9 +865,19 @@ class DbusAggBatService(object):
                 exception_object,
                 exception_traceback,
             ) = sys.exc_info()
+            # sys.exc_info() hands back the OUTERMOST traceback entry, which is this
+            # frame: reporting it names the self._update() call site above, not the
+            # code that actually failed. Walk to the innermost entry so the summary
+            # line points at the raising statement, and let exc_info=True append the
+            # frames in between, which is what tells you how the recompute got there.
+            while exception_traceback.tb_next is not None:
+                exception_traceback = exception_traceback.tb_next
             file = exception_traceback.tb_frame.f_code.co_filename
             line = exception_traceback.tb_lineno
-            logging.error(f"Exception occurred in reactive update: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
+            logging.error(
+                f"Exception occurred in reactive update: {repr(exception_object)} of type {exception_type} in {file} line #{line}",
+                exc_info=True,
+            )
         finally:
             self._updating = False
         return False  # one-shot
