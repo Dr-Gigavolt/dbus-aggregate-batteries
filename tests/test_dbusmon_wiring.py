@@ -1,17 +1,18 @@
 """Tests that DbusMon hands the reactive callback through to DbusMonitor.
 
-DbusMonitor is replaced by a recording stub (see driver_stubs), so constructing
+DbusMonitor is replaced by a recording stub (see driver_harness), so constructing
 DbusMon touches no D-Bus at all and the constructor arguments can be inspected.
+The dbusmon module itself is the real one: it is what is under test here.
 """
 
 import unittest
 
-import driver_stubs
+import driver_harness
 
 
 class DbusMonWiringTestCase(unittest.TestCase):
     def setUp(self):
-        self.dbusmon = driver_stubs.load_dbusmon()
+        self.dbusmon = driver_harness.load_dbusmon()
 
     def test_callback_is_passed_as_value_changed_callback(self):
         def callback(service, path, options, changes, device_instance):  # pragma: no cover - never invoked
@@ -26,7 +27,7 @@ class DbusMonWiringTestCase(unittest.TestCase):
 
     def test_ignored_service_is_the_name_the_driver_publishes_under(self):
         """ignoreServices is the primary defence against our own publishes feeding back; it must name the right service."""
-        driver = driver_stubs.load_driver()
+        driver = driver_harness.driver
         monitor = self.dbusmon.DbusMon().dbusmon
         self.assertIn(driver.AGGREGATE_SERVICE_NAME, monitor.kwargs["ignoreServices"])
 
@@ -41,11 +42,11 @@ class DbusMonWiringTestCase(unittest.TestCase):
 
     def test_driver_registers_its_reactive_callback_with_dbusmon(self):
         """_startMonitor must wire _on_input_changed through DbusMon into DbusMonitor."""
-        driver = driver_stubs.load_driver()
-        service = object.__new__(driver.DbusAggBatService)
+        driver = driver_harness.driver
+        service = driver_harness.new_service()
         service._startMonitor()
 
-        callback = driver_stubs.RecordingDbusMonitor.last_instance.kwargs["valueChangedCallback"]
+        callback = driver_harness.RecordingDbusMonitor.last_instance.kwargs["valueChangedCallback"]
         self.assertEqual(callback.__func__, driver.DbusAggBatService._on_input_changed)
         self.assertIs(callback.__self__, service)
 

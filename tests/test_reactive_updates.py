@@ -11,7 +11,7 @@ calls, so the queued idle callback runs only when a test decides to run it.
 import inspect
 import unittest
 
-import driver_stubs
+import driver_harness
 
 
 class _RecordingUpdate:
@@ -57,21 +57,15 @@ NON_BATTERY_SERVICES = [
 
 class ReactiveSchedulingTestCase(unittest.TestCase):
     def setUp(self):
-        self.driver = driver_stubs.load_driver()
-        self.glib = driver_stubs.FakeGLib()
-        self._original_glib = self.driver.GLib
-        self.driver.GLib = self.glib
-        self.addCleanup(self._restore_glib)
-
-    def _restore_glib(self):
-        self.driver.GLib = self._original_glib
+        self.driver = driver_harness.driver
+        self.glib = driver_harness.patch_glib(self)
 
     def _make_service(self, reactive_ready=True, update=None):
-        service = object.__new__(self.driver.DbusAggBatService)
-        service._reactive_ready = reactive_ready
-        service._updating = False
-        service._update = update if update is not None else _RecordingUpdate()
-        return service
+        return driver_harness.new_service(
+            _reactive_ready=reactive_ready,
+            _updating=False,
+            _update=update if update is not None else _RecordingUpdate(),
+        )
 
     @staticmethod
     def _change(service, path="/Dc/0/Voltage", value=52.1):
