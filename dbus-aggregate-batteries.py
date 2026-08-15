@@ -842,6 +842,20 @@ class DbusAggBatService(object):
     def _update_reactive(self):
         try:
             self._update()
+        except Exception:
+            # An exception escaping a GLib idle callback is printed to stderr by
+            # PyGObject and never reaches the service log, where it would be seen.
+            # _update() owns the read-trial and restart logic internally (and exits
+            # via SystemExit, which is not caught here), so this only makes an
+            # otherwise invisible failure visible.
+            (
+                exception_type,
+                exception_object,
+                exception_traceback,
+            ) = sys.exc_info()
+            file = exception_traceback.tb_frame.f_code.co_filename
+            line = exception_traceback.tb_lineno
+            logging.error(f"Exception occurred in reactive update: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
         finally:
             self._updating = False
         return False  # one-shot

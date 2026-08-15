@@ -169,18 +169,39 @@ class ReactiveSchedulingTestCase(unittest.TestCase):
         service = self._make_service()
         self.assertIs(service._update_reactive(), False)
 
+    def test_failing_update_is_logged_instead_of_escaping_the_idle_callback(self):
+        service = self._make_service(update=_RecordingUpdate(raises=RuntimeError("boom")))
+        service._on_input_changed(*self._change("com.victronenergy.battery.ttyUSB0"))
+
+        with self.assertLogs(level="ERROR") as captured:
+            results = self.glib.run_pending_idle()
+
+        self.assertEqual(results, [False], "the callback must stay one-shot even when the update failed")
+        self.assertEqual(len(captured.records), 1)
+        message = captured.records[0].getMessage()
+        self.assertIn("RuntimeError('boom')", message)
+        self.assertIn("dbus-aggregate-batteries.py", message)
+
     def test_updating_guard_is_cleared_when_update_raises(self):
         service = self._make_service(update=_RecordingUpdate(raises=RuntimeError("boom")))
         service._on_input_changed(*self._change("com.victronenergy.battery.ttyUSB0"))
-        with self.assertRaises(RuntimeError):
+        with self.assertLogs(level="ERROR"):
             self.glib.run_pending_idle()
         self.assertFalse(service._updating, "the finally block must clear _updating even on failure")
+
+    def test_system_exit_from_update_is_not_swallowed(self):
+        """_update() exits the process when READ_TRIALS is exceeded; that must still propagate."""
+        service = self._make_service(update=_RecordingUpdate(raises=SystemExit(1)))
+        service._on_input_changed(*self._change("com.victronenergy.battery.ttyUSB0"))
+        with self.assertRaises(SystemExit):
+            self.glib.run_pending_idle()
+        self.assertFalse(service._updating)
 
     def test_reactive_updates_recover_after_a_failed_update(self):
         failing = _RecordingUpdate(raises=RuntimeError("boom"))
         service = self._make_service(update=failing)
         service._on_input_changed(*self._change("com.victronenergy.battery.ttyUSB0"))
-        with self.assertRaises(RuntimeError):
+        with self.assertLogs(level="ERROR"):
             self.glib.run_pending_idle()
 
         healthy = _RecordingUpdate()
