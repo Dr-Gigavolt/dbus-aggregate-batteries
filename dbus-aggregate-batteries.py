@@ -50,19 +50,31 @@ _STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_ba
 #
 # The update loop rewrites every D-Bus path each cycle with raw floats, so
 # nearly every path lands in every ItemsChanged payload even when nothing
-# meaningful changed. This proxy deduplicates exact repeats for all paths
-# and suppresses numeric flicker below a per-path significance threshold
-# (compared against the LAST PUBLISHED value, so cumulative drift still
-# emits). Control-relevant paths (/Info CVL/CCL/DCL), alarms, flags and
-# strings are deliberately NOT thresholded — they publish on any change.
-# A periodic heartbeat clears the cache so freshness watchers see full
-# re-publishes. Pattern proven in dbus-aggregate-smartshunts (quiet bank:
-# ~0.5 ItemsChanged/s -> 0).
+# meaningful changed. velib already drops writes that are exactly equal to
+# the published value (VeDbusItemExport._local_set_value returns None), so
+# the only thing this proxy adds is a per-path significance threshold:
+# numeric flicker smaller than the threshold is not written at all.
+# Control-relevant paths (/Info CVL/CCL/DCL), alarms, flags and strings are
+# deliberately NOT thresholded — they publish on any change. Pattern proven
+# in dbus-aggregate-smartshunts (quiet bank: ~0.5 ItemsChanged/s -> 0).
+#
+# The comparison is made against the value currently published on D-Bus,
+# read back through the service context, NOT against a shadow copy of what
+# this driver last wrote. That matters twice over:
+#   * cumulative drift still emits, because the base only moves when a write
+#     actually goes through;
+#   * if anything else writes one of these (writeable) paths over D-Bus, the
+#     next comparison is against that foreign value, so the driver's own
+#     value is no longer suppressed and is reasserted on the next cycle —
+#     the behaviour that existed before the gate was added.
+#
+# Every PUBLISH_HEARTBEAT_S the thresholds are bypassed for one cycle so
+# values that drifted less than their threshold are brought up to date.
+# Values that are exactly equal are still not written; velib would not emit
+# for them anyway.
 #
 # Thresholds and heartbeat are configurable, see the "Dbus publish gate"
-# section of config.default.ini. A threshold of 0 leaves the path ungated
-# (dedup only).
-_SENTINEL = object()
+# section of config.default.ini. A threshold of 0 leaves the path ungated.
 
 PUBLISH_GATE_THRESHOLDS = {
     "/Dc/0/Voltage": settings.PUBLISH_GATE_VOLTAGE,  # V
@@ -85,15 +97,19 @@ class _GatedDbusServiceContext:
         self._ctx = ctx
 
     def __setitem__(self, path, value):
-        cache = self._proxy._cache
-        prev = cache.get(path, _SENTINEL)
+        # The currently published value, not a copy of what we last wrote.
+        prev = self._ctx[path]
         if prev is value or prev == value:
             return
-        if prev is not _SENTINEL and isinstance(value, (int, float)) and isinstance(prev, (int, float)):
+        # NaN is not equal to itself, so an unchanged NaN passes the check
+        # above and the threshold check below and would be written every
+        # cycle. Treat NaN following NaN as unchanged.
+        if prev != prev and value != value:
+            return
+        if not self._proxy._heartbeat and isinstance(value, (int, float)) and isinstance(prev, (int, float)):
             threshold = PUBLISH_GATE_THRESHOLDS.get(path)
             if threshold is not None and abs(value - prev) < threshold:
                 return
-        cache[path] = value
         self._ctx[path] = value
 
     def __getitem__(self, path):
@@ -101,25 +117,26 @@ class _GatedDbusServiceContext:
 
 
 class _GatedDbusService:
-    """Proxy around VeDbusService adding dedup + significance gating."""
+    """Proxy around VeDbusService adding significance gating."""
 
     def __init__(self, svc):
         self._svc = svc
-        self._cache = {}
         self._last_heartbeat = tt.time()
+        self._heartbeat = False
+        """ True while a heartbeat cycle is in progress; thresholds are bypassed """
 
     def __enter__(self):
         now = tt.time()
-        if now - self._last_heartbeat >= PUBLISH_HEARTBEAT_S:
+        self._heartbeat = now - self._last_heartbeat >= PUBLISH_HEARTBEAT_S
+        if self._heartbeat:
             self._last_heartbeat = now
-            self._cache.clear()
         return _GatedDbusServiceContext(self, self._svc.__enter__())
 
     def __exit__(self, *exc):
         return self._svc.__exit__(*exc)
 
     def __setitem__(self, path, value):
-        self._cache[path] = value
+        # Outside a with block; velib drops the write if the value is unchanged.
         self._svc[path] = value
 
     def __getitem__(self, path):
