@@ -906,9 +906,27 @@ class DbusAggBatService(object):
                     Current += current_get
                     Power += power_get
                 else:
-                    Voltage += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
-                    Current += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
-                    Power += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
+                    voltage_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Voltage")
+                    current_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Current")
+                    power_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Power")
+
+                    # A battery can be on the bus but not yet serving data (e.g. a BLE
+                    # BMS shortly after a restart). Do NOT skip such a constituent the
+                    # way the cell extrema below do: Current and Power are sums and
+                    # Voltage is divided by NR_OF_BATTERIES afterwards, so dropping a
+                    # battery would under-report the bank and publish a wrong number to
+                    # DVCC. The read trial / retry / restart path stays exactly as it
+                    # was; what changes is only that the failure names the battery and
+                    # the offending value instead of a bare TypeError from "+= None".
+                    if voltage_get is None or current_get is None or power_get is None:
+                        raise ValueError(
+                            "Missing mandatory D-Bus value while reading battery %s: "
+                            "Voltage=%s, Current=%s, Power=%s" % (i, voltage_get, current_get, power_get)
+                        )
+
+                    Voltage += voltage_get
+                    Current += current_get
+                    Power += power_get
 
                 # Capacity
                 step = "Read and calculate capacity, SoC, Time to go"
@@ -947,7 +965,15 @@ class DbusAggBatService(object):
 
                 # Temperature
                 step = "Read temperatures"
-                Temperature += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Temperature")
+                temperature_get = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Temperature")
+
+                # same reasoning as for V, I, P above: Temperature is divided by
+                # NR_OF_BATTERIES afterwards, so a skipped constituent would skew the
+                # published average. Retry as before, only with a diagnosable message.
+                if temperature_get is None:
+                    raise ValueError("Missing mandatory D-Bus value while reading battery %s: Temperature=%s" % (i, temperature_get))
+
+                Temperature += temperature_get
                 MaxCellTemp_dict[
                     "%s: %s"
                     % (
