@@ -1022,7 +1022,7 @@ class DbusAggBatService(object):
                 HighChargeCurrent_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighChargeCurrent"))
                 HighDischargeCurrent_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighDischargeCurrent"))
                 CellImbalance_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/CellImbalance"))
-                InternalFailure_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/InternalFailure_alarm"))
+                InternalFailure_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/InternalFailure"))
                 HighChargeTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighChargeTemperature"))
                 LowChargeTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/LowChargeTemperature"))
                 HighTemperature_alarm_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Alarms/HighTemperature"))
