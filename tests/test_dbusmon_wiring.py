@@ -24,6 +24,12 @@ class DbusMonWiringTestCase(unittest.TestCase):
         monitor = self.dbusmon.DbusMon(value_changed_callback=lambda *args: None).dbusmon
         self.assertEqual(monitor.kwargs["ignoreServices"], ["com.victronenergy.battery.aggregate"])
 
+    def test_ignored_service_is_the_name_the_driver_publishes_under(self):
+        """ignoreServices is the primary defence against our own publishes feeding back; it must name the right service."""
+        driver = driver_stubs.load_driver()
+        monitor = self.dbusmon.DbusMon().dbusmon
+        self.assertIn(driver.AGGREGATE_SERVICE_NAME, monitor.kwargs["ignoreServices"])
+
     def test_callback_defaults_to_none(self):
         monitor = self.dbusmon.DbusMon().dbusmon
         self.assertIsNone(monitor.kwargs["valueChangedCallback"])

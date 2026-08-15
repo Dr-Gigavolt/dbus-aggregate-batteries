@@ -46,6 +46,11 @@ VERSION = "4.3.20260611-beta"
 _STATE_FILE_CHARGE = "/data/apps/dbus-aggregate-batteries/storedvalue_charge"
 _STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
 
+# our own D-Bus service name, and the prefix of the physical battery services we
+# aggregate (the trailing dot matters: it must not match e.g. a "batterysomething")
+AGGREGATE_SERVICE_NAME = "com.victronenergy.battery.aggregate"
+BATTERY_SERVICE_PREFIX = "com.victronenergy.battery."
+
 
 def _write_atomic(path: str, content: str) -> None:
     """Write content atomically to path via a temporary file and os.replace."""
@@ -64,7 +69,7 @@ def get_bus():
 
 class DbusAggBatService(object):
 
-    def __init__(self, servicename="com.victronenergy.battery.aggregate"):
+    def __init__(self, servicename=AGGREGATE_SERVICE_NAME):
         self._fn = Functions()
         self._batteries_dict = {}
         """ dictionary with battery name as key and dbus service as value """
@@ -832,7 +837,14 @@ class DbusAggBatService(object):
         # DbusMonitor already marshals value changes onto the GLib main loop, so
         # this runs there and needs no locking. It still only schedules: one
         # _update() per burst, instead of one per changed path.
-        if not str(service).startswith("com.victronenergy.battery"):
+        service = str(service)
+        if not service.startswith(BATTERY_SERVICE_PREFIX):
+            return
+        # Never recompute because of our own publishes: that would be a feedback
+        # loop, and a nasty one to diagnose in the field. dbusmon's ignoreServices
+        # is the primary defence, this second one costs a single comparison and
+        # does not depend on how the monitor was set up.
+        if service == AGGREGATE_SERVICE_NAME:
             return
         if not self._reactive_ready or self._updating:
             return

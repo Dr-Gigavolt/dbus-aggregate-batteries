@@ -8,6 +8,7 @@ heavyweight class method.  GLib is swapped for a stub that records scheduling
 calls, so the queued idle callback runs only when a test decides to run it.
 """
 
+import inspect
 import unittest
 
 import driver_stubs
@@ -48,6 +49,9 @@ NON_BATTERY_SERVICES = [
     "com.victronenergy.settings",
     "com.victronenergy.dcload.ttyUSB2",
     "com.victronenergy.multi.ttyUSB3",
+    # no trailing dot: a service whose name merely begins with "battery" is not a battery
+    "com.victronenergy.batterysomething",
+    "com.victronenergy.batterymonitor.ttyUSB4",
 ]
 
 
@@ -98,6 +102,20 @@ class ReactiveSchedulingTestCase(unittest.TestCase):
                 self.assertEqual(self.glib.idle_calls, [])
                 self.assertFalse(service._updating)
                 self.assertEqual(service._update.calls, 0)
+
+    def test_our_own_service_never_schedules_an_update(self):
+        """Called directly, as if dbusmon's ignoreServices had not filtered it: our own publishes must not feed back."""
+        service = self._make_service()
+        service._on_input_changed(*self._change(self.driver.AGGREGATE_SERVICE_NAME, path="/Dc/0/Voltage", value=52.4))
+        self.assertEqual(self.glib.idle_calls, [])
+        self.assertFalse(service._updating)
+        self.assertEqual(service._update.calls, 0)
+
+    def test_own_service_name_matches_the_default_service_name(self):
+        """The skip-self guard is worthless if the constant drifts from the name the service registers under."""
+        default = inspect.signature(self.driver.DbusAggBatService.__init__).parameters["servicename"].default
+        self.assertEqual(default, self.driver.AGGREGATE_SERVICE_NAME)
+        self.assertTrue(self.driver.AGGREGATE_SERVICE_NAME.startswith(self.driver.BATTERY_SERVICE_PREFIX))
 
     def test_service_name_is_stringified_before_the_prefix_check(self):
         service = self._make_service()
