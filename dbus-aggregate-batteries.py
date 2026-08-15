@@ -58,19 +58,23 @@ _STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_ba
 # A periodic heartbeat clears the cache so freshness watchers see full
 # re-publishes. Pattern proven in dbus-aggregate-smartshunts (quiet bank:
 # ~0.5 ItemsChanged/s -> 0).
+#
+# Thresholds and heartbeat are configurable, see the "Dbus publish gate"
+# section of config.default.ini. A threshold of 0 leaves the path ungated
+# (dedup only).
 _SENTINEL = object()
 
 PUBLISH_GATE_THRESHOLDS = {
-    "/Dc/0/Voltage": 0.01,  # V
-    "/Dc/0/Current": 0.1,  # A
-    "/Dc/0/Power": 5.0,  # W
-    "/Dc/0/Temperature": 0.2,  # degC
-    "/TimeToGo": 60,  # s
-    "/ConsumedAmphours": 0.1,  # Ah
-    "/Soc": 0.1,  # %
+    "/Dc/0/Voltage": settings.PUBLISH_GATE_VOLTAGE,  # V
+    "/Dc/0/Current": settings.PUBLISH_GATE_CURRENT,  # A
+    "/Dc/0/Power": settings.PUBLISH_GATE_POWER,  # W
+    "/Dc/0/Temperature": settings.PUBLISH_GATE_TEMPERATURE,  # degC
+    "/TimeToGo": settings.PUBLISH_GATE_TIME_TO_GO,  # s
+    "/ConsumedAmphours": settings.PUBLISH_GATE_CONSUMED_AMPHOURS,  # Ah
+    "/Soc": settings.PUBLISH_GATE_SOC,  # %
 }
 
-PUBLISH_HEARTBEAT_S = 900
+PUBLISH_HEARTBEAT_S = settings.PUBLISH_HEARTBEAT
 
 
 class _GatedDbusServiceContext:

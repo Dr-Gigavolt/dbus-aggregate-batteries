@@ -329,6 +329,33 @@ SEND_CELL_VOLTAGES: int = get_int_from_config("DEFAULT", "SEND_CELL_VOLTAGES")
 LOG_PERIOD: int = get_int_from_config("DEFAULT", "LOG_PERIOD")
 
 
+# ----- Dbus publish gate -----
+# Minimum change of a measured value before it is published on Dbus again.
+# 0 publishes on every change (repeated identical values are still suppressed).
+PUBLISH_GATE_VOLTAGE: float = get_float_from_config("DEFAULT", "PUBLISH_GATE_VOLTAGE")
+PUBLISH_GATE_CURRENT: float = get_float_from_config("DEFAULT", "PUBLISH_GATE_CURRENT")
+PUBLISH_GATE_POWER: float = get_float_from_config("DEFAULT", "PUBLISH_GATE_POWER")
+PUBLISH_GATE_TEMPERATURE: float = get_float_from_config("DEFAULT", "PUBLISH_GATE_TEMPERATURE")
+PUBLISH_GATE_SOC: float = get_float_from_config("DEFAULT", "PUBLISH_GATE_SOC")
+PUBLISH_GATE_TIME_TO_GO: float = get_float_from_config("DEFAULT", "PUBLISH_GATE_TIME_TO_GO")
+PUBLISH_GATE_CONSUMED_AMPHOURS: float = get_float_from_config("DEFAULT", "PUBLISH_GATE_CONSUMED_AMPHOURS")
+PUBLISH_HEARTBEAT: int = get_int_from_config("DEFAULT", "PUBLISH_HEARTBEAT")
+
+for _option, _value in (
+    ("PUBLISH_GATE_VOLTAGE", PUBLISH_GATE_VOLTAGE),
+    ("PUBLISH_GATE_CURRENT", PUBLISH_GATE_CURRENT),
+    ("PUBLISH_GATE_POWER", PUBLISH_GATE_POWER),
+    ("PUBLISH_GATE_TEMPERATURE", PUBLISH_GATE_TEMPERATURE),
+    ("PUBLISH_GATE_SOC", PUBLISH_GATE_SOC),
+    ("PUBLISH_GATE_TIME_TO_GO", PUBLISH_GATE_TIME_TO_GO),
+    ("PUBLISH_GATE_CONSUMED_AMPHOURS", PUBLISH_GATE_CONSUMED_AMPHOURS),
+):
+    check_config_issue(_value < 0, f"{_option} must be 0 or greater.")
+del _option, _value
+
+check_config_issue(PUBLISH_HEARTBEAT <= 0, "PUBLISH_HEARTBEAT must be greater than 0.")
+
+
 # print errors and exit if there are any
 if errors_in_config:
     logging.error("Errors in config file:")
