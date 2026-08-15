@@ -829,7 +829,9 @@ class DbusAggBatService(object):
     REACTIVE_FLOOR_S = 10
 
     def _on_input_changed(self, service, path, options, changes, device_instance):
-        # Called on the dbusmonitor thread — only schedule, never compute.
+        # DbusMonitor already marshals value changes onto the GLib main loop, so
+        # this runs there and needs no locking. It still only schedules: one
+        # _update() per burst, instead of one per changed path.
         if not str(service).startswith("com.victronenergy.battery"):
             return
         if not self._reactive_ready or self._updating:
