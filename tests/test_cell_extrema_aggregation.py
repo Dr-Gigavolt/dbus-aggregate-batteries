@@ -13,7 +13,11 @@ import logging
 import unittest
 from unittest import mock
 
-from driver_harness import Battery, DriverTestCase, driver
+from driver_harness import Battery, DriverTestCase, FakeDbusMon, driver
+
+# the injected clock lives with the tolerance tests, which is where it is
+# explained; both suites are flat modules in tests/, as is driver_harness itself
+from test_missing_data_tolerance import FakeClock
 
 
 class PartialCellVoltageDataTest(DriverTestCase):
@@ -330,6 +334,197 @@ class AsymmetricExtremaTest(DriverTestCase):
         for message in warnings:
             self.assertIn("Max. and Min.", message)
             self.assertIn("'Silent'", message)
+
+
+class ExtremaWarningThrottleTest(DriverTestCase):
+    """A constituent stays cell blind for a while, and the log must survive it.
+
+    Being excluded from an extrema aggregation is not a gap: the other batteries
+    have cell data, so the aggregate is computed and published every cycle. But
+    a battery running on its fallback shunt has no per-cell data until its BMS
+    answers - 19 s of it on the system this was measured on, which used to be 96
+    warning lines - and with reactive updates the number of cycles inside that
+    window is set by how chatty the other batteries are. The announcement and the
+    recovery must always be logged; only the repeats are throttled.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.clock = FakeClock()
+        patcher = mock.patch.object(driver, "tt", self.clock)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.healthy = Battery("Reporting")
+        self.blind = Battery("Blind")
+
+    def serve(self, service, batteries):
+        """Re-read the (mutated) batteries, the way the next cycle would."""
+        values = {}
+        for battery in batteries:
+            values.update(battery.values())
+        service._dbusMon = FakeDbusMon(values)
+
+    def blind_to_cell_voltages(self, battery):
+        battery.max_cell_voltage = None
+        battery.min_cell_voltage = None
+
+    def blind_to_cell_temperatures(self, battery):
+        battery.max_cell_temperature = None
+        battery.min_cell_temperature = None
+
+    def counts(self, captured):
+        """(announcements, throttled repeats, recoveries) in the captured log."""
+        lines = [record.getMessage() for record in captured.records]
+        return (
+            len([message for message in lines if "missing from" in message and "still missing" not in message]),
+            len([message for message in lines if "still missing from" in message]),
+            len([message for message in lines if "complete again" in message]),
+        )
+
+    def run_cycles(self, service, count):
+        for _ in range(count):
+            self.assertTrue(service._update())
+            self.clock.advance(1)
+
+    def test_a_long_cell_blind_window_costs_a_bounded_number_of_lines(self):
+        self.blind_to_cell_voltages(self.blind)
+        self.blind_to_cell_temperatures(self.blind)
+        service = self.make_service([self.healthy, self.blind])
+
+        with self.assertLogs(level="WARNING") as captured:
+            # a minute of it: without the throttle this was two lines per cycle
+            self.run_cycles(service, 60)
+
+            self.blind.max_cell_voltage = 3.35
+            self.blind.min_cell_voltage = 3.30
+            self.blind.max_cell_temperature = 25.0
+            self.blind.min_cell_temperature = 20.0
+            self.serve(service, [self.healthy, self.blind])
+            self.assertTrue(service._update())
+
+        announcements, repeats, recoveries = self.counts(captured)
+        # one announcement and one recovery per dimension, and a repeat every
+        # MISSING_DATA_LOG_PERIOD seconds in between: 14 lines, not 120
+        self.assertEqual(2, announcements)
+        self.assertEqual(2 * (60 // driver.MISSING_DATA_LOG_PERIOD - 1), repeats)
+        self.assertEqual(2, recoveries)
+        self.assertEqual(14, len(captured.records))
+
+    def test_the_window_is_announced_and_closed_naming_the_battery(self):
+        self.blind_to_cell_voltages(self.blind)
+        service = self.make_service([self.healthy, self.blind])
+
+        with self.assertLogs(level="WARNING") as captured:
+            self.run_cycles(service, 30)
+            self.blind.max_cell_voltage = 3.35
+            self.blind.min_cell_voltage = 3.30
+            self.serve(service, [self.healthy, self.blind])
+            service._update()
+
+        lines = [record.getMessage() for record in captured.records]
+        self.assertIn("Max. and Min. cell voltage missing from 'Blind' — excluded from aggregation this cycle", lines[0])
+        recovery = [message for message in lines if "complete again" in message]
+        self.assertEqual(1, len(recovery))
+        self.assertIn("'Blind'", recovery[0])
+        self.assertIn("Cell voltage", recovery[0])
+        self.assertIn("30 s", recovery[0])
+        self.assertNotIn("Reporting", " ".join(lines), "the battery that reports must never be named")
+
+    def test_repeats_carry_how_long_it_has_lasted(self):
+        self.blind_to_cell_voltages(self.blind)
+        service = self.make_service([self.healthy, self.blind])
+
+        with self.assertLogs(level="WARNING") as captured:
+            self.run_cycles(service, 25)
+
+        repeats = [record.getMessage() for record in captured.records if "still missing from" in record.getMessage()]
+        self.assertEqual(2, len(repeats))
+        self.assertIn("after 10 s", repeats[0])
+        self.assertIn("after 20 s", repeats[1])
+
+    def test_a_second_battery_going_blind_is_announced_at_once(self):
+        """One open window must not swallow the next battery dropping out."""
+        self.blind_to_cell_voltages(self.blind)
+        late = Battery("Late")
+        service = self.make_service([self.healthy, self.blind, late])
+
+        with self.assertLogs(level="WARNING") as captured:
+            self.run_cycles(service, 5)
+            # well inside the throttle window of the first battery
+            self.blind_to_cell_voltages(late)
+            self.serve(service, [self.healthy, self.blind, late])
+            service._update()
+
+        lines = [record.getMessage() for record in captured.records]
+        self.assertEqual(2, len(lines), "expected exactly the two announcements, got %r" % lines)
+        self.assertIn("'Blind'", lines[0])
+        self.assertIn("'Late'", lines[1])
+
+    def test_each_battery_recovers_on_its_own(self):
+        self.blind_to_cell_voltages(self.blind)
+        late = Battery("Late", max_cell_voltage=None, min_cell_voltage=None)
+        service = self.make_service([self.healthy, self.blind, late])
+
+        with self.assertLogs(level="WARNING") as captured:
+            self.run_cycles(service, 3)
+            late.max_cell_voltage = 3.35
+            late.min_cell_voltage = 3.30
+            self.serve(service, [self.healthy, self.blind, late])
+            self.run_cycles(service, 1)
+
+        recovery = [record.getMessage() for record in captured.records if "complete again" in record.getMessage()]
+        self.assertEqual(1, len(recovery))
+        self.assertIn("'Late'", recovery[0])
+        # the other battery is still out, and still not repeating itself
+        self.assertEqual((2, 0, 1), self.counts(captured))
+
+    def test_a_new_window_after_a_recovery_is_announced_again(self):
+        self.blind_to_cell_voltages(self.blind)
+        service = self.make_service([self.healthy, self.blind])
+
+        with self.assertLogs(level="WARNING") as captured:
+            self.run_cycles(service, 2)
+            self.blind.max_cell_voltage = 3.35
+            self.blind.min_cell_voltage = 3.30
+            self.serve(service, [self.healthy, self.blind])
+            self.run_cycles(service, 1)
+            self.blind_to_cell_voltages(self.blind)
+            self.serve(service, [self.healthy, self.blind])
+            self.run_cycles(service, 1)
+
+        self.assertEqual((2, 0, 1), self.counts(captured))
+
+    def test_losing_the_second_half_of_the_pair_is_announced(self):
+        """A half missing is throttled; the other half going too is news again."""
+        self.blind.min_cell_voltage = None
+        service = self.make_service([self.healthy, self.blind])
+
+        with self.assertLogs(level="WARNING") as captured:
+            self.run_cycles(service, 3)
+            self.blind.max_cell_voltage = None
+            self.serve(service, [self.healthy, self.blind])
+            self.run_cycles(service, 3)
+
+        lines = [record.getMessage() for record in captured.records]
+        self.assertEqual(2, len(lines))
+        self.assertIn("Min. cell voltage missing", lines[0])
+        self.assertIn("Max. and Min. cell voltage missing", lines[1])
+
+    def test_the_aggregation_itself_is_unaffected_by_the_throttle(self):
+        """Throttling the log must not change a single published value."""
+        self.blind_to_cell_voltages(self.blind)
+        reporting = Battery("Reporting", max_cell_voltage=3.48, max_voltage_cell_id=7, min_cell_voltage=3.21, min_voltage_cell_id=11)
+        service = self.make_service([reporting, self.blind])
+
+        with self.assertLogs(level="WARNING"):
+            self.run_cycles(service, 30)
+
+        published = service._dbusservice.published
+        self.assertEqual(3.48, published["/System/MaxCellVoltage"])
+        self.assertEqual("Reporting: 7", published["/System/MaxVoltageCellId"])
+        self.assertEqual(3.21, published["/System/MinCellVoltage"])
+        self.assertEqual(1, service._readTrials)
 
 
 if __name__ == "__main__":
