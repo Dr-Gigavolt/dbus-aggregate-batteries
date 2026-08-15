@@ -117,6 +117,12 @@ class DbusAggBatService(object):
     _missingDataExpired = False
     """ True once the current gap has outlived MISSING_DATA_TOLERANCE """
 
+    _extremaMissing = None
+    """ {(quantity, battery): {halves, since, last_log}} for the constituents currently
+    excluded from an extrema aggregation. Filled in on first use by
+    _warn_missing_extrema(), never here: a dictionary at class level would be one
+    dictionary for every instance. """
+
     def __init__(self, servicename="com.victronenergy.battery.aggregate"):
         self._fn = Functions()
         self._batteries_dict = {}
@@ -851,8 +857,7 @@ class DbusAggBatService(object):
             logging.warning(f"Exception occurred: {repr(exception_object)} of type {exception_type} in {file} line #{line}")
             return False
 
-    @staticmethod
-    def _warn_missing_extrema(quantity, max_dict, min_dict):
+    def _warn_missing_extrema(self, quantity, max_dict, min_dict):
         """
         Name every constituent that is about to be excluded from an extrema aggregation.
 
@@ -866,6 +871,21 @@ class DbusAggBatService(object):
         is announced once, saying both are missing, not twice. The dictionary
         keys are "<custom name>: <cell id>" and the cell id of a missing value
         is itself usually None, so the batteries are grouped by the name part.
+
+        This is not a gap in the sense of ConstituentDataMissing: the other
+        batteries still have cell data, so the aggregation is computed and
+        published as usual. It is a state that lasts, though - a battery running
+        on its fallback shunt has no per-cell data by construction until its BMS
+        answers, which was 19 s on the system this was measured on - so it gets
+        the same treatment as a tolerated gap: announced when it starts,
+        repeated at most every MISSING_DATA_LOG_PERIOD while it lasts, and
+        announced again when the cell data comes back. The first line and the
+        recovery line are never throttled; only the repeats are.
+
+        The state is tracked per battery and per quantity, so one battery going
+        cell blind neither suppresses nor delays the announcement of the next
+        one, and a battery losing the second half of a pair is announced again
+        rather than folded into the throttled repeats.
         """
         missing = {}
         for half, extrema_dict in (("Max.", max_dict), ("Min.", min_dict)):
@@ -873,8 +893,34 @@ class DbusAggBatService(object):
                 if value is None:
                     missing.setdefault(key.rsplit(": ", 1)[0], []).append(half)
 
+        now = tt.time()
+        # created here, never at class level: a mutable class attribute would be
+        # shared by every instance
+        if self._extremaMissing is None:
+            self._extremaMissing = {}
+
         for battery, halves in missing.items():
-            logging.warning("%s %s missing from '%s' — excluded from aggregation this cycle" % (" and ".join(halves), quantity, battery))
+            halves_text = " and ".join(halves)
+            state = self._extremaMissing.get((quantity, battery))
+
+            if state is None or state["halves"] != halves_text:
+                # a new exclusion, or a different half of the pair went missing
+                logging.warning("%s %s missing from '%s' — excluded from aggregation this cycle" % (halves_text, quantity, battery))
+                self._extremaMissing[(quantity, battery)] = {
+                    "halves": halves_text,
+                    "since": now if state is None else state["since"],
+                    "last_log": now,
+                }
+            elif now - state["last_log"] >= MISSING_DATA_LOG_PERIOD:
+                logging.warning(
+                    "%s %s still missing from '%s' after %.0f s — still excluded from aggregation" % (halves_text, quantity, battery, now - state["since"])
+                )
+                state["last_log"] = now
+
+        for tracked_quantity, battery in list(self._extremaMissing):
+            if tracked_quantity == quantity and battery not in missing:
+                state = self._extremaMissing.pop((tracked_quantity, battery))
+                logging.warning("%s of '%s' complete again after %.0f s — back in the aggregation" % (quantity.capitalize(), battery, now - state["since"]))
 
     def _tolerate_missing_data(self, error):
         """

@@ -105,7 +105,9 @@ While a battery is not serving data, **nothing is published at all**. `Current` 
 
 `MISSING_DATA_TOLERANCE` (default `60` seconds) is how long this is waited out. The restart of a battery driver has been observed to take 47 seconds. When the values are complete again, publishing resumes and the log says how long the gap lasted. When the tolerance is exceeded, the read is counted as a failure as before and the driver exits after `READ_TRIALS` so that the service manager restarts it. Set `MISSING_DATA_TOLERANCE = 0` to switch the waiting off and count read failures immediately.
 
-The log names the battery and the missing value when the gap opens, repeats it every 10 seconds while it lasts, and logs the recovery. A battery that reports no cell voltages or temperatures while others do is still only excluded from that aggregation, with a warning per cycle, as before.
+The log names the battery and the missing value when the gap opens, repeats it every 10 seconds while it lasts, and logs the recovery.
+
+A battery that reports no cell voltages or temperatures while the others do is not a gap: it is excluded from that one aggregation and the aggregated values are published as usual. This is logged the same way, per battery and per quantity — named when it is first excluded, repeated every 10 seconds while it lasts, and named again when its cell data comes back. A battery running on its fallback shunt has no cell data until its BMS answers, which can be tens of seconds, and the number of update cycles in that time depends on how often the other batteries report a change.
 
 ### Smart Shunts as battery current source
 
