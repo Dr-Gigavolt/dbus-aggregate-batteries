@@ -57,7 +57,7 @@ class DbusMon:
                 "/Alarms/HighChargeCurrent": dummy,
                 "/Alarms/HighDischargeCurrent": dummy,
                 "/Alarms/CellImbalance": dummy,
-                "/Alarms/InternalFailure_alarm": dummy,
+                "/Alarms/InternalFailure": dummy,
                 "/Alarms/HighChargeTemperature": dummy,
                 "/Alarms/LowChargeTemperature": dummy,
                 "/Alarms/HighTemperature": dummy,
