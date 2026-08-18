@@ -946,7 +946,8 @@ class DbusAggBatService(object):
 
                 # Temperature
                 step = "Read temperatures"
-                Temperature += self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Temperature")
+                _temp = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Dc/0/Temperature")
+                Temperature += _temp if _temp is not None else 0
                 MaxCellTemp_dict[
                     "%s: %s"
                     % (
@@ -1059,12 +1060,21 @@ class DbusAggBatService(object):
                 AllowToBalance_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Io/AllowToBalance"))
 
             step = "Find max. and min. cell temperature of all batteries"
-            # placed in try-except structure for the case if some values are of None.
-            # The _max() and _min() don't work with dictionaries
-            MaxTempCellId = max(MaxCellTemp_dict, key=MaxCellTemp_dict.get)
-            MaxCellTemp = MaxCellTemp_dict[MaxTempCellId]
-            MinTempCellId = min(MinCellTemp_dict, key=MinCellTemp_dict.get)
-            MinCellTemp = MinCellTemp_dict[MinTempCellId]
+            # Filter out None values — some BMS types (e.g. aiobmsble) do not provide temperature data
+            _MaxCellTemp_valid = {k: v for k, v in MaxCellTemp_dict.items() if v is not None}
+            _MinCellTemp_valid = {k: v for k, v in MinCellTemp_dict.items() if v is not None}
+            if _MaxCellTemp_valid:
+                MaxTempCellId = max(_MaxCellTemp_valid, key=_MaxCellTemp_valid.get)
+                MaxCellTemp = _MaxCellTemp_valid[MaxTempCellId]
+            else:
+                MaxTempCellId = None
+                MaxCellTemp = None
+            if _MinCellTemp_valid:
+                MinTempCellId = min(_MinCellTemp_valid, key=_MinCellTemp_valid.get)
+                MinCellTemp = _MinCellTemp_valid[MinTempCellId]
+            else:
+                MinTempCellId = None
+                MinCellTemp = None
 
             step = "Find max. and min. cell voltage of all batteries"
             # placed in try-except structure for the case if some values are of None.
