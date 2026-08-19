@@ -1041,12 +1041,29 @@ class DbusAggBatService(object):
                 # Aggregate charge/discharge parameters
                 else:
                     step = "Read charge parameters"
+                    # A battery that is on the bus but not yet serving data answers None
+                    # here. Appending that None makes Functions._min() return None for the
+                    # whole bank, which is published as an invalid CVL and then raises in
+                    # the periodic logging below, outside any try - and an exception leaving
+                    # _update() makes GLib drop the timeout source, so the driver stops
+                    # updating for good while its service stays on the bus. Raise instead,
+                    # so the read trial handling above retries and restarts as designed.
+                    max_charge_current = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeCurrent")
+                    max_discharge_current = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxDischargeCurrent")
+                    max_charge_voltage = self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeVoltage")
+
+                    if max_charge_current is None or max_discharge_current is None or max_charge_voltage is None:
+                        raise ValueError(
+                            "Missing charge parameter while reading battery %s: MaxChargeVoltage=%s, MaxChargeCurrent=%s, MaxDischargeCurrent=%s"
+                            % (i, max_charge_voltage, max_charge_current, max_discharge_current)
+                        )
+
                     # list of max. charge currents to find minimum
-                    MaxChargeCurrent_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeCurrent"))
+                    MaxChargeCurrent_list.append(max_charge_current)
                     # list of max. discharge currents  to find minimum
-                    MaxDischargeCurrent_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxDischargeCurrent"))
+                    MaxDischargeCurrent_list.append(max_discharge_current)
                     # list of max. charge voltages  to find minimum
-                    MaxChargeVoltage_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/MaxChargeVoltage"))
+                    MaxChargeVoltage_list.append(max_charge_voltage)
                     # list of charge modes of batteries (Bulk, Absorption, Float, Keep always max voltage)
                     ChargeMode_list.append(self._dbusMon.dbusmon.get_value(self._batteries_dict[i], "/Info/ChargeMode"))
 
