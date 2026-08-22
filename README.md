@@ -97,6 +97,26 @@ On start, the program searches for DBus services:
 The data from DBus are collected, processed and the results are sent back to DBus once per second.
 Dbus monitor defined in dbusmon.py is used instead of VeDbusItemImport which was very resource hungry (since V2.0). I strongly recommend to everyone modifying the code to keep this technique.
 
+### Measurement graph
+
+This driver republishes values it computes from other battery services, so anything summing DC current across the bus would count the same energy twice: once in this service and once in each battery it aggregates. Name matching is the usual workaround and it is fragile — a driver can be renamed, and a user can set any `CustomName`.
+
+The service therefore states what it is, in five string paths shared with the battery drivers:
+
+| Path | Value | Published by | Meaning |
+| --- | --- | --- | --- |
+| `/Measurement/Kind` | `direct` or `derived` | every participant | `direct`: I measure a physical device. `derived`: I compute from other services |
+| `/Measurement/PhysicalDevice` | opaque string | `direct` only | grouping key — two services with the same value measure the same physical thing |
+| `/Measurement/PeerServices` | comma-separated service names | `direct` only | other services observing my physical device |
+| `/Measurement/LineAuthority` | single service name | `direct` only | which service is the truth for line voltage and current |
+| `/Measurement/TracksServices` | comma-separated service names | `derived` only | what I aggregate |
+
+This driver is `derived`, so it publishes `Kind` and `TracksServices` and nothing else: the three `direct` keys identify a physical device and would be meaningless here. `TracksServices` is filled once the battery search completes, sorted and comma separated without spaces, and it names the services actually discovered rather than anything configured.
+
+A consumer can then exclude this service structurally instead of by name, and knows exactly which services it would be double counting.
+
+The full contract — value formats, how a consumer resolves the graph, and what an absent path means — is in [docs/measurement-topology.md](docs/measurement-topology.md). The same document ships with the battery drivers that publish the `direct` half.
+
 ### Smart Shunts as battery current source
 
 By default the aggregate computes bank current as `Quattro/Multiplus + solar chargers + DC-load shunts`. This is correct for most setups, but it cannot see current sources the driver does not enumerate — most notably Orion DC-DC converters (registered as `com.victronenergy.dcdc`), which often carry alternator charge into the battery bank. In that case the driver under-reports charge current and the alternator contribution is invisible to ESS, DVCC and VRM.
