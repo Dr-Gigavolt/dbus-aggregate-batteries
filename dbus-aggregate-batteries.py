@@ -46,6 +46,11 @@ VERSION = "4.3.20260611-beta"
 _STATE_FILE_CHARGE = "/data/apps/dbus-aggregate-batteries/storedvalue_charge"
 _STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
 
+# our own D-Bus service name, and the prefix of the physical battery services we
+# aggregate (the trailing dot matters: it must not match e.g. a "batterysomething")
+AGGREGATE_SERVICE_NAME = "com.victronenergy.battery.aggregate"
+BATTERY_SERVICE_PREFIX = "com.victronenergy.battery."
+
 
 def _write_atomic(path: str, content: str) -> None:
     """Write content atomically to path via a temporary file and os.replace."""
@@ -64,7 +69,7 @@ def get_bus():
 
 class DbusAggBatService(object):
 
-    def __init__(self, servicename="com.victronenergy.battery.aggregate"):
+    def __init__(self, servicename=AGGREGATE_SERVICE_NAME):
         self._fn = Functions()
         self._batteries_dict = {}
         """ dictionary with battery name as key and dbus service as value """
@@ -98,6 +103,12 @@ class DbusAggBatService(object):
         self._multi_connected = True
         # implementing hysteresis for allowing discharge
         self._fullyDischarged = False
+        # reactive-update coalescing guard (see _on_input_changed)
+        self._updating = False
+        # reactive triggers stay disarmed until the battery search completed
+        # and the periodic update loop has been started (_update is not safe
+        # to run before then)
+        self._reactive_ready = False
         self._dbusConn = get_bus()
         logging.info("Initializing VeDbusService...")
         self._dbusservice = VeDbusService(servicename, self._dbusConn, register=False)
@@ -315,7 +326,7 @@ class DbusAggBatService(object):
 
     def _startMonitor(self):
         logging.info("Starting dbusmonitor...")
-        self._dbusMon = DbusMon()
+        self._dbusMon = DbusMon(value_changed_callback=self._on_input_changed)
         logging.info("dbusmonitor started")
 
     # ####################################################################
@@ -624,7 +635,8 @@ class DbusAggBatService(object):
             else:
                 self._timeOld = tt.time()
                 # if current from BMS start the _update loop
-                GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
+                self._reactive_ready = True
+                GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
 
             # all OK, stop calling this function
             return False
@@ -695,7 +707,8 @@ class DbusAggBatService(object):
         else:
             self._timeOld = tt.time()
             # if no MPPTs start the _update loop
-            GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
+            self._reactive_ready = True
+            GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
 
         # all OK, stop calling this function
         return False
@@ -731,7 +744,8 @@ class DbusAggBatService(object):
         logging.info("> %d MPPT(s) found." % (mpptsCount))
         if mpptsCount == settings.NR_OF_MPPTS:
             self._timeOld = tt.time()
-            GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
+            self._reactive_ready = True
+            GLib.timeout_add_seconds(max(self.REACTIVE_FLOOR_S, settings.UPDATE_INTERVAL_DATA), self._update)
             # all OK, stop calling this function
             return False
         elif self._searchTrials < settings.SEARCH_TRIALS:
@@ -803,6 +817,70 @@ class DbusAggBatService(object):
     # ### aggregate values of physical batteries, perform calculations, update Dbus ###
     # #################################################################################
     # #################################################################################
+
+    # ── Reactive updates (perf) ─────────────────────────────────────────
+    #
+    # Pattern from dbus-aggregate-smartshunts: instead of recomputing all
+    # aggregate values on a fixed 1 s timer regardless of change, run
+    # _update() when a monitored battery value actually changed.  The
+    # periodic timer remains as a slow floor (see REACTIVE_FLOOR_S) so
+    # time-integration, staleness detection and the read-failure counters
+    # keep ticking even on a completely silent bus.  Bursts are coalesced
+    # by the _updating guard: changes arriving while an update is queued
+    # or running are served by that run (it reads the monitor's current
+    # cache), not queued again.  With gated publishers upstream, an idle
+    # bank costs near-zero CPU; real changes propagate with less latency
+    # than the old fixed poll.
+    REACTIVE_FLOOR_S = 10
+
+    def _on_input_changed(self, service, path, options, changes, device_instance):
+        # DbusMonitor already marshals value changes onto the GLib main loop, so
+        # this runs there and needs no locking. It still only schedules: one
+        # _update() per burst, instead of one per changed path.
+        service = str(service)
+        if not service.startswith(BATTERY_SERVICE_PREFIX):
+            return
+        # Never recompute because of our own publishes: that would be a feedback
+        # loop, and a nasty one to diagnose in the field. dbusmon's ignoreServices
+        # is the primary defence, this second one costs a single comparison and
+        # does not depend on how the monitor was set up.
+        if service == AGGREGATE_SERVICE_NAME:
+            return
+        if not self._reactive_ready or self._updating:
+            return
+        self._updating = True
+        GLib.idle_add(self._update_reactive)
+
+    def _update_reactive(self):
+        try:
+            self._update()
+        except Exception:
+            # An exception escaping a GLib idle callback is printed to stderr by
+            # PyGObject and never reaches the service log, where it would be seen.
+            # _update() owns the read-trial and restart logic internally (and exits
+            # via SystemExit, which is not caught here), so this only makes an
+            # otherwise invisible failure visible.
+            (
+                exception_type,
+                exception_object,
+                exception_traceback,
+            ) = sys.exc_info()
+            # sys.exc_info() hands back the OUTERMOST traceback entry, which is this
+            # frame: reporting it names the self._update() call site above, not the
+            # code that actually failed. Walk to the innermost entry so the summary
+            # line points at the raising statement, and let exc_info=True append the
+            # frames in between, which is what tells you how the recompute got there.
+            while exception_traceback.tb_next is not None:
+                exception_traceback = exception_traceback.tb_next
+            file = exception_traceback.tb_frame.f_code.co_filename
+            line = exception_traceback.tb_lineno
+            logging.error(
+                f"Exception occurred in reactive update: {repr(exception_object)} of type {exception_type} in {file} line #{line}",
+                exc_info=True,
+            )
+        finally:
+            self._updating = False
+        return False  # one-shot
 
     def _update(self):
 

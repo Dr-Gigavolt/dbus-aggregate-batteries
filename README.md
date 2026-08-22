@@ -94,8 +94,14 @@ On start, the program searches for DBus services:
 - Multiplus or Quattro (or cluster of them) for DC current measurement
 - all solar chargers (SmartSolar, BlueSolar, MPPT RS) for DC current measurement
 
-The data from DBus are collected, processed and the results are sent back to DBus once per second.
+The data from DBus are collected, processed and the results are sent back to DBus when a monitored battery value changes, and in any case periodically.
 Dbus monitor defined in dbusmon.py is used instead of VeDbusItemImport which was very resource hungry (since V2.0). I strongly recommend to everyone modifying the code to keep this technique.
+
+### Reactive updates
+
+The aggregated values are recalculated when one of the monitored batteries reports a changed value, instead of on a fixed one second timer. A burst of changes results in one recalculation, not one per value. Changes therefore reach DBus sooner than with the old poll, and an idle bank costs almost no CPU.
+
+The timer remains as a slow floor so that time integration, staleness detection and the read failure counter keep running on a silent bus. Its period is `UPDATE_INTERVAL_DATA`, but at least 10 seconds — with reactive updates a shorter period would only repeat work that has already been done.
 
 ### Smart Shunts as battery current source
 
