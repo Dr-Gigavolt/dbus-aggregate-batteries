@@ -97,6 +97,26 @@ On start, the program searches for DBus services:
 The data from DBus are collected, processed and the results are sent back to DBus once per second.
 Dbus monitor defined in dbusmon.py is used instead of VeDbusItemImport which was very resource hungry (since V2.0). I strongly recommend to everyone modifying the code to keep this technique.
 
+### Dbus publish gate
+
+Aggregated values are averages, so they almost never repeat exactly and nearly every path would end up in an `ItemsChanged` signal every second, even on an idle bank. Every consumer (systemcalc, VRM logger, GUI, MQTT) pays for that. A value is therefore only published again once it has moved by at least its threshold, measured against the value last published, so slow drift is never lost:
+
+| Option | Default | Path |
+| --- | --- | --- |
+| `PUBLISH_GATE_VOLTAGE` | 0.01 V | `/Dc/0/Voltage` |
+| `PUBLISH_GATE_CURRENT` | 0.1 A | `/Dc/0/Current` |
+| `PUBLISH_GATE_POWER` | 5 W | `/Dc/0/Power` |
+| `PUBLISH_GATE_TEMPERATURE` | 0.2 °C | `/Dc/0/Temperature` |
+| `PUBLISH_GATE_SOC` | 0.1 % | `/Soc` |
+| `PUBLISH_GATE_TIME_TO_GO` | 60 s | `/TimeToGo` |
+| `PUBLISH_GATE_CONSUMED_AMPHOURS` | 0.1 Ah | `/ConsumedAmphours` |
+
+Set a threshold to `0` to publish that value on every change. Values that did not change at all are never re-sent, whatever the threshold.
+
+Charge and discharge limits (`CVL`, `CCL`, `DCL`), alarms and texts are **not** gated — they are published immediately on any change, so DVCC and alarm consumers never see a delayed value.
+
+`PUBLISH_HEARTBEAT` (default `900` seconds) re-publishes everything periodically, so consumers watching the update time still see the service as alive on a quiet bank.
+
 ### Smart Shunts as battery current source
 
 By default the aggregate computes bank current as `Quattro/Multiplus + solar chargers + DC-load shunts`. This is correct for most setups, but it cannot see current sources the driver does not enumerate — most notably Orion DC-DC converters (registered as `com.victronenergy.dcdc`), which often carry alternator charge into the battery bank. In that case the driver under-reports charge current and the alternator contribution is invisible to ESS, DVCC and VRM.

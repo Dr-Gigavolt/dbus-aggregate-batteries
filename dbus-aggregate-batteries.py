@@ -46,6 +46,124 @@ VERSION = "4.3.20260611-beta"
 _STATE_FILE_CHARGE = "/data/apps/dbus-aggregate-batteries/storedvalue_charge"
 _STATE_FILE_BALANCING = "/data/apps/dbus-aggregate-batteries/storedvalue_last_balancing"
 
+# ── Publish gate (perf) ──────────────────────────────────────────────────
+#
+# The update loop rewrites every D-Bus path each cycle with raw floats, so
+# nearly every path lands in every ItemsChanged payload even when nothing
+# meaningful changed. velib already drops writes that are exactly equal to
+# the published value (VeDbusItemExport._local_set_value returns None), so
+# the only thing this proxy adds is a per-path significance threshold:
+# numeric flicker smaller than the threshold is not written at all.
+# Control-relevant paths (/Info CVL/CCL/DCL), alarms, flags and strings are
+# deliberately NOT thresholded — they publish on any change. Pattern proven
+# in dbus-aggregate-smartshunts (quiet bank: ~0.5 ItemsChanged/s -> 0).
+#
+# The comparison is made against the value currently published on D-Bus,
+# read back through the service context, NOT against a shadow copy of what
+# this driver last wrote. That matters twice over:
+#   * cumulative drift still emits, because the base only moves when a write
+#     actually goes through;
+#   * if anything else writes one of these (writeable) paths over D-Bus, the
+#     next comparison is against that foreign value, so the driver's own
+#     value is no longer suppressed and is reasserted on the next cycle —
+#     the behaviour that existed before the gate was added.
+#
+# Every PUBLISH_HEARTBEAT_S the thresholds are bypassed for one cycle so
+# values that drifted less than their threshold are brought up to date.
+# Values that are exactly equal are still not written; velib would not emit
+# for them anyway.
+#
+# Thresholds and heartbeat are configurable, see the "Dbus publish gate"
+# section of config.default.ini. A threshold of 0 leaves the path ungated.
+
+PUBLISH_GATE_THRESHOLDS = {
+    "/Dc/0/Voltage": settings.PUBLISH_GATE_VOLTAGE,  # V
+    "/Dc/0/Current": settings.PUBLISH_GATE_CURRENT,  # A
+    "/Dc/0/Power": settings.PUBLISH_GATE_POWER,  # W
+    "/Dc/0/Temperature": settings.PUBLISH_GATE_TEMPERATURE,  # degC
+    "/TimeToGo": settings.PUBLISH_GATE_TIME_TO_GO,  # s
+    "/ConsumedAmphours": settings.PUBLISH_GATE_CONSUMED_AMPHOURS,  # Ah
+    "/Soc": settings.PUBLISH_GATE_SOC,  # %
+}
+
+PUBLISH_HEARTBEAT_S = settings.PUBLISH_HEARTBEAT
+
+# The comparison base is the published float, not a rounded copy of it, and a
+# threshold like 0.1 has no exact binary representation. A genuine one step
+# change can therefore come out fractionally below its own threshold and be
+# suppressed: 100.0 - 99.9 is 0.09999999999999432, which is < 0.1. Roughly 60 %
+# of one step changes are affected at the shipped thresholds. One ulp-ish of
+# slack makes a real step always publish, while movement genuinely below the
+# threshold is still gated.
+_GATE_TOLERANCE = 1e-9
+
+
+def _is_gateable_number(value) -> bool:
+    """
+    True for values a threshold may be applied to.
+
+    bool is a subclass of int and must never be threshold compared: it has no
+    meaningful magnitude, and a True/False flip is always significant.
+    """
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+class _GatedDbusServiceContext:
+    """Write-through context wrapper applying the publish gate."""
+
+    def __init__(self, proxy, ctx):
+        self._proxy = proxy
+        self._ctx = ctx
+
+    def __setitem__(self, path, value):
+        # The currently published value, not a copy of what we last wrote.
+        prev = self._ctx[path]
+        if prev is value or prev == value:
+            return
+        # NaN is not equal to itself, so an unchanged NaN passes the check
+        # above and the threshold check below and would be written every
+        # cycle. Treat NaN following NaN as unchanged.
+        if prev != prev and value != value:
+            return
+        if not self._proxy._heartbeat and _is_gateable_number(value) and _is_gateable_number(prev):
+            threshold = PUBLISH_GATE_THRESHOLDS.get(path)
+            if threshold is not None and abs(value - prev) < threshold - _GATE_TOLERANCE:
+                return
+        self._ctx[path] = value
+
+    def __getitem__(self, path):
+        return self._ctx[path]
+
+
+class _GatedDbusService:
+    """Proxy around VeDbusService adding significance gating."""
+
+    def __init__(self, svc):
+        self._svc = svc
+        self._last_heartbeat = tt.time()
+        self._heartbeat = False
+        """ True while a heartbeat cycle is in progress; thresholds are bypassed """
+
+    def __enter__(self):
+        now = tt.time()
+        self._heartbeat = now - self._last_heartbeat >= PUBLISH_HEARTBEAT_S
+        if self._heartbeat:
+            self._last_heartbeat = now
+        return _GatedDbusServiceContext(self, self._svc.__enter__())
+
+    def __exit__(self, *exc):
+        return self._svc.__exit__(*exc)
+
+    def __setitem__(self, path, value):
+        # Outside a with block; velib drops the write if the value is unchanged.
+        self._svc[path] = value
+
+    def __getitem__(self, path):
+        return self._svc[path]
+
+    def __getattr__(self, name):
+        return getattr(self._svc, name)
+
 
 def _write_atomic(path: str, content: str) -> None:
     """Write content atomically to path via a temporary file and os.replace."""
@@ -100,7 +218,7 @@ class DbusAggBatService(object):
         self._fullyDischarged = False
         self._dbusConn = get_bus()
         logging.info("Initializing VeDbusService...")
-        self._dbusservice = VeDbusService(servicename, self._dbusConn, register=False)
+        self._dbusservice = _GatedDbusService(VeDbusService(servicename, self._dbusConn, register=False))
         logging.info("VeDbusService initialized")
         self._timeOld = tt.time()
         # written when dynamic CVL limit activated
