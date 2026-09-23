@@ -1,7 +1,15 @@
-## Version 4.3.20260611
+## Version 4.3.20260923
 
 dj0abr:
-- Pylontech support added. Activate by setting CAN_batteries = True in config.ini
+- PR 157: Pylontech support added. Activate by setting CAN_batteries = True in config.ini
+
+cgoudie:
+- PR 164, style: make the black lint job pass again
+- PR 167, fix: the internal failure alarm is read from a path that does not exist
+- PR 170, fix: a battery that omits its charge limits stops the update loop for good
+
+Dr-Gigavolt
+- issue 169, fix: KEEP_MAX_CVL not working properly
 
 ## Version 4.2.20260514
 
