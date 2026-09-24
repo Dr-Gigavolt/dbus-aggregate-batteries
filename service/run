@@ -1,20 +1,8 @@
 #!/bin/sh
 
-# Forward signals to the child process
-trap 'kill -TERM $PID' TERM INT
-
-# Start the main process
+# Replace the shell with the driver so supervise's TERM/INT reaches python
+# directly. The previous trap/wait shim forwarded a single TERM and then
+# exited the shell, which let supervise respawn the service while the old
+# python could still be alive holding the dbus name (restart loop).
 exec 2>&1
-exec python3 /data/apps/dbus-aggregate-batteries/dbus-aggregate-batteries.py &
-
-# Capture the PID of the child process
-PID=$!
-
-# Wait for the child process to exit
-wait $PID
-
-# Capture the exit status
-EXIT_STATUS=$?
-
-# Exit with the same status
-exit $EXIT_STATUS
+exec python3 /data/apps/dbus-aggregate-batteries/dbus-aggregate-batteries.py
