@@ -177,6 +177,12 @@ class DbusAggBatService(object):
         self._dbusservice.add_path("/FirmwareVersion", VERSION)
         self._dbusservice.add_path("/HardwareVersion", VERSION)
         self._dbusservice.add_path("/Connected", 1)
+        # Measurement-graph declaration: this service re-publishes values
+        # rolled up from other battery services; summing consumers must not
+        # count it alongside its constituents. See docs/measurement-topology.md.
+        # TracksServices is filled once the battery search completes.
+        self._dbusservice.add_path("/Measurement/Kind", "derived")
+        self._dbusservice.add_path("/Measurement/TracksServices", "", writeable=True)
 
         # Create DC paths
         self._dbusservice.add_path(
@@ -624,6 +630,7 @@ class DbusAggBatService(object):
             else:
                 self._timeOld = tt.time()
                 # if current from BMS start the _update loop
+                self._dbusservice["/Measurement/TracksServices"] = ",".join(sorted(self._batteries_dict.values()))
                 GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
 
             # all OK, stop calling this function
@@ -695,6 +702,7 @@ class DbusAggBatService(object):
         else:
             self._timeOld = tt.time()
             # if no MPPTs start the _update loop
+            self._dbusservice["/Measurement/TracksServices"] = ",".join(sorted(self._batteries_dict.values()))
             GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
 
         # all OK, stop calling this function
@@ -731,6 +739,7 @@ class DbusAggBatService(object):
         logging.info("> %d MPPT(s) found." % (mpptsCount))
         if mpptsCount == settings.NR_OF_MPPTS:
             self._timeOld = tt.time()
+            self._dbusservice["/Measurement/TracksServices"] = ",".join(sorted(self._batteries_dict.values()))
             GLib.timeout_add_seconds(settings.UPDATE_INTERVAL_DATA, self._update)
             # all OK, stop calling this function
             return False
