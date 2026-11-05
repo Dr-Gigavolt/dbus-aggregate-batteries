@@ -17,7 +17,7 @@ from dbus.mainloop.glib import DBusGMainLoop  # noqa: E402
 
 
 class DbusMon:
-    def __init__(self):
+    def __init__(self, value_changed_callback=None):
         dummy = {"code": None, "whenToLog": "configChange", "accessLevel": None}
         self.monitorlist = {
             "com.victronenergy.battery": {
@@ -141,7 +141,11 @@ class DbusMon:
             },
         }
 
-        self.dbusmon = DbusMonitor(self.monitorlist, ignoreServices=["com.victronenergy.battery.aggregate"])
+        self.dbusmon = DbusMonitor(
+            self.monitorlist,
+            valueChangedCallback=value_changed_callback,
+            ignoreServices=["com.victronenergy.battery.aggregate"],
+        )
 
     def print_values(self, service, mon_list):
         for path in self.monitorlist[mon_list]:
