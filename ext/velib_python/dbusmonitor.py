@@ -30,6 +30,16 @@ from ve_utils import exit_on_error, wrap_dbus_value, unwrap_dbus_value, add_name
 # dbus interface
 VE_INTERFACE = "com.victronenergy.BusItem"
 
+# Timeout (seconds) for the blocking D-Bus calls used while (re)scanning a service,
+# e.g. in response to a NameOwnerChanged signal. These calls run synchronously on the
+# GLib main loop thread, which also services this process's own D-Bus requests, so an
+# unresponsive remote service must fail fast here rather than block for dbus-python's
+# default timeout (~25s) - otherwise this process itself becomes unresponsive to
+# everything else for the duration of the scan. A failed call already falls through to
+# the existing DBusException handling (legacy scan fallback, per-path skip, etc.), so
+# this only bounds the worst case; it does not change behavior when calls succeed.
+SCAN_CALL_TIMEOUT = 5
+
 # For lookups where None is a valid result
 notfound = object()
 
@@ -230,7 +240,7 @@ class DbusMonitor(object):
 		# Try to fetch everything with a GetItems, then fall back to older
 		# methods if that fails
 		try:
-			values = self.dbusConn.call_blocking(serviceName, '/', VE_INTERFACE, 'GetItems', '', [])
+			values = self.dbusConn.call_blocking(serviceName, '/', VE_INTERFACE, 'GetItems', '', [], timeout=SCAN_CALL_TIMEOUT)
 		except dbus.exceptions.DBusException:
 			logger.info("GetItems failed, trying legacy methods")
 		else:
@@ -247,7 +257,7 @@ class DbusMonitor(object):
 		else:
 			try:
 				di = self.dbusConn.call_blocking(serviceName,
-					'/DeviceInstance', VE_INTERFACE, 'GetValue', '', [])
+					'/DeviceInstance', VE_INTERFACE, 'GetValue', '', [], timeout=SCAN_CALL_TIMEOUT)
 			except dbus.exceptions.DBusException:
 				logger.info("       %s was skipped because it has no device instance" % serviceName)
 				return False # Skip it
@@ -262,8 +272,8 @@ class DbusMonitor(object):
 		values = {}
 		texts = {}
 		try:
-			values.update(self.dbusConn.call_blocking(serviceName, '/', VE_INTERFACE, 'GetValue', '', []))
-			texts.update(self.dbusConn.call_blocking(serviceName, '/', VE_INTERFACE, 'GetText', '', []))
+			values.update(self.dbusConn.call_blocking(serviceName, '/', VE_INTERFACE, 'GetValue', '', [], timeout=SCAN_CALL_TIMEOUT))
+			texts.update(self.dbusConn.call_blocking(serviceName, '/', VE_INTERFACE, 'GetText', '', [], timeout=SCAN_CALL_TIMEOUT))
 		except:
 			pass
 
@@ -283,9 +293,9 @@ class DbusMonitor(object):
 			text = texts.get(path[1:], notfound)
 			if value is notfound or text is notfound:
 				try:
-					value = self.dbusConn.call_blocking(serviceName, path, VE_INTERFACE, 'GetValue', '', [])
+					value = self.dbusConn.call_blocking(serviceName, path, VE_INTERFACE, 'GetValue', '', [], timeout=SCAN_CALL_TIMEOUT)
 					service.set_seen(path)
-					text = self.dbusConn.call_blocking(serviceName, path, VE_INTERFACE, 'GetText', '', [])
+					text = self.dbusConn.call_blocking(serviceName, path, VE_INTERFACE, 'GetText', '', [], timeout=SCAN_CALL_TIMEOUT)
 				except dbus.exceptions.DBusException as e:
 					if e.get_dbus_name() in (
 							'org.freedesktop.DBus.Error.ServiceUnknown',
