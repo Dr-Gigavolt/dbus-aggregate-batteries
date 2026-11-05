@@ -1444,6 +1444,18 @@ class DbusAggBatService(object):
                 # weighted sum
                 TimeToGo = TimeToGo / InstalledCapacity
 
+        # When a battery-mode SmartShunt is configured as the authoritative SoC
+        # source (SMARTSHUNT_AS_SOC_SOURCE = True), use its own reported /Soc
+        # directly, overriding whichever of the two paths above just ran. Use
+        # this when the BMS's own SoC reporting is not trustworthy but a
+        # dedicated battery monitor is wired to see all bank current and
+        # already computes its own SoC. Only /Soc is overridden here - voltage,
+        # current, capacity, and TimeToGo are unaffected.
+        if settings.SMARTSHUNT_AS_SOC_SOURCE and self._num_battery_shunts > 0:
+            shunt_soc = self._dbusMon.dbusmon.get_value(self._smartShunt_list[0], "/Soc")
+            if shunt_soc is not None:
+                Soc = shunt_soc
+
         #######################
         # Send values to DBus #
         #######################
