@@ -104,6 +104,7 @@ On start, the program searches for DBus services:
 
 The data from DBus are collected, processed and the results are sent back to DBus once per second.
 Dbus monitor defined in dbusmon.py is used instead of VeDbusItemImport which was very resource hungry (since V2.0). I strongly recommend to everyone modifying the code to keep this technique.
+The monitor listens only to the services the aggregation reads, as listed by `_followed_services()` in the driver, instead of to every service on the bus. Code that reads another service from the monitor must add it there; otherwise the read returns `None` and logs a warning.
 
 ### Smart Shunts as battery current source
 

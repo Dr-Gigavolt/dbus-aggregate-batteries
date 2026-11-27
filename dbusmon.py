@@ -10,10 +10,126 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "ext", "velib_python"
 # optionally from victron
 # sys.path.insert(1, "/opt/victronenergy/dbus-systemcalc-py/ext/velib_python")
 
-from dbusmonitor import DbusMonitor  # noqa: E402
+from dbusmonitor import DbusMonitor, SCAN_CALL_TIMEOUT  # noqa: E402
 from dbus.mainloop.glib import DBusGMainLoop  # noqa: E402
 
 # from gi.repository import GLib  # not accessed
+
+
+BUSITEM_INTERFACE = "com.victronenergy.BusItem"
+
+
+class FollowingDbusMonitor(DbusMonitor):
+    """A DbusMonitor that listens to BusItem signals per service, never from every sender.
+
+    velib's constructor subscribes to PropertiesChanged and ItemsChanged with no
+    sender, so dbus-daemon delivers every BusItem signal on the bus to this
+    process and the handlers drop all but a few. On a Cerbo that is about ten
+    wake-ups a second for nothing. Here those two receivers are replaced by one
+    pair per service, registered under the service's well-known name: the
+    daemon delivers a signal only if its sender owns that name at the time, and
+    dbus-python follows the owner client-side, so the match survives an owner
+    change. The pair is registered before the service is scanned, so nothing
+    that changes after its GetItems is missed, and removed when it leaves the bus.
+
+    Until follow_only() is called, every service the monitor scans is followed,
+    so the device search reads a cache as live as before. After it, only the
+    named services are. A read of any other one returns the default, as if the
+    service were absent, rather than a value that has stopped updating: the
+    driver's read guards handle a missing value, a stale one goes unnoticed.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self._followed = None
+        """None: every service the monitor scans; otherwise the set to keep following"""
+
+        self._receivers = {}
+        """service name -> its (PropertiesChanged, ItemsChanged) receivers"""
+
+        self._warned_unfollowed = set()
+        super().__init__(*args, **kwargs)
+
+    def _scan_dbus(self):
+        # The base constructor subscribed from every sender just before calling this.
+        self.dbusConn.remove_signal_receiver(self.handler_value_changes, "PropertiesChanged", BUSITEM_INTERFACE)
+        self.dbusConn.remove_signal_receiver(self.handler_item_changes, "ItemsChanged", BUSITEM_INTERFACE, None, "/")
+        super()._scan_dbus()
+
+    def _is_followed(self, serviceName):
+        return self._followed is None or serviceName in self._followed
+
+    def _subscribe(self, serviceName):
+        if serviceName in self._receivers:
+            return
+        self._receivers[serviceName] = (
+            self.dbusConn.add_signal_receiver(
+                self.handler_value_changes,
+                dbus_interface=BUSITEM_INTERFACE,
+                signal_name="PropertiesChanged",
+                bus_name=serviceName,
+                path_keyword="path",
+                sender_keyword="senderId",
+            ),
+            self.dbusConn.add_signal_receiver(
+                self.handler_item_changes,
+                dbus_interface=BUSITEM_INTERFACE,
+                signal_name="ItemsChanged",
+                bus_name=serviceName,
+                path="/",
+                sender_keyword="senderId",
+            ),
+        )
+
+    def _unsubscribe(self, serviceName):
+        for receiver in self._receivers.pop(serviceName, ()):
+            receiver.remove()
+
+    def scan_dbus_service_inner(self, serviceName, *args, **kwargs):
+        # Inside velib's try in scan_dbus_service: if subscribing fails, the scan
+        # fails and the service stays out of the cache, which reads as missing.
+        if self._is_followed(serviceName):
+            self._subscribe(serviceName)
+        return super().scan_dbus_service_inner(serviceName, *args, **kwargs)
+
+    def _process_name_owner_changed(self, name, oldowner, newowner):
+        if newowner == "":
+            self._unsubscribe(name)
+        super()._process_name_owner_changed(name, oldowner, newowner)
+
+    def follow_only(self, serviceNames):
+        """Keep following only ``serviceNames``; stop listening to every other service.
+
+        Cheap when the set is unchanged, so it can be called on every update. Never
+        raises: a service it cannot start following is treated as absent, and
+        retried on the next call.
+        """
+        wanted = {str(name) for name in serviceNames if self.service_wanted(str(name))}
+        if wanted == self._followed:
+            return
+        self._followed = set(wanted)
+        for name in list(self._receivers):
+            if name not in wanted:
+                self._unsubscribe(name)
+        for name in sorted(wanted):
+            if name in self.servicesByName and name not in self._receivers:
+                # not listened to until now, so its cached values may be stale
+                try:
+                    self._subscribe(name)
+                    values = self.dbusConn.call_blocking(name, "/", BUSITEM_INTERFACE, "GetItems", "", [], timeout=SCAN_CALL_TIMEOUT)
+                    self.handler_item_changes(values, self.servicesByName[name].id)
+                except Exception:
+                    logging.exception("dbusmonitor: could not start following %s, treating it as absent" % name)
+                    self._unsubscribe(name)
+                    self._followed.discard(name)
+        logging.info("dbusmonitor: following only %s" % ", ".join(sorted(self._followed)))
+
+    def get_value(self, serviceName, objectPath, default_value=None):
+        if not self._is_followed(serviceName):
+            if serviceName not in self._warned_unfollowed:
+                self._warned_unfollowed.add(serviceName)
+                logging.warning("dbusmonitor: %s is read but not followed, treating it as absent" % serviceName)
+            return default_value
+        return super().get_value(serviceName, objectPath, default_value)
 
 
 class DbusMon:
@@ -141,7 +257,7 @@ class DbusMon:
             },
         }
 
-        self.dbusmon = DbusMonitor(self.monitorlist, ignoreServices=["com.victronenergy.battery.aggregate"])
+        self.dbusmon = FollowingDbusMonitor(self.monitorlist, ignoreServices=["com.victronenergy.battery.aggregate"])
 
     def print_values(self, service, mon_list):
         for path in self.monitorlist[mon_list]:
